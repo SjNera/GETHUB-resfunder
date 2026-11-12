@@ -29,6 +29,8 @@ const I={check:sv('<path d="M3.5 8.5l3 3 6-7"/>'),x:sv('<path d="M4.5 4.5l7 7M11
   pen:sv('<path d="M10.5 2.5l3 3L6 13H3v-3z"/><path d="M9 4l3 3"/>'),pause:sv('<path d="M5.5 3.5v9M10.5 3.5v9"/>'),refund:sv('<path d="M3 6.5h7.5a3 3 0 010 6H6M5.5 3.5L2.5 6.5l3 3"/>'),send:sv('<path d="M14 2L7 9M14 2l-4.5 12L7 9 2 6.5z"/>')};
 const fx=I.wallet;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* Flat fee per response (PRD: fee = quota x fee per response). Units of 0.0001 tBNB. */
+const FEE_UNITS=0.5,FEE_TXT='0.00005 tBNB',feeOf=s=>Math.round(s.quota*FEE_UNITS);
 const peso=n=>{const v=Math.round(n)*0.0001;return (v>=100?Math.round(v).toLocaleString('en-PH'):String(+v.toFixed(5)))+' tBNB'};
 const rsp=n=>'RSP-'+String(n).padStart(6,'0');
 const MY_WALLET='0x8f3a7c19e0b4d26a51f8c3e97d0a4b6e2c5f21bd', DEMO_WALLET='0x5d7e9a41c2b8f03e6d17a95b4c08e2f13ad6a03c';
@@ -361,7 +363,7 @@ function sOverview(s){
     if(closed)return k+`<div class="card empty" style="margin-top:18px"><h3>This survey is closed</h3><p>See the answers in the Results tab.</p><button class="btn dark" data-stab="results">Open results</button></div>`;
     return k+`<div class="card chartc">${emptyChart(s)}</div>`}
   const st=stats(),pt=60+10*Object.values(S.decided).filter(x=>x.d==='pay').length;
-  return `<div class="kpis">${kpi(I.users,st.resp,'+6 today','up','Total respondents',`<div class="mini"><span style="width:40%"></span></div>`)}${kpi(I.coins,peso(st.paid),'+'+peso(pt)+' today','up','Paid out of ₱1,500')}
+  return `<div class="kpis">${kpi(I.users,st.resp,'+6 today','up','Total respondents',`<div class="mini"><span style="width:40%"></span></div>`)}${kpi(I.coins,peso(st.paid),'+'+peso(pt)+' today','up','Paid out of '+peso(s.rate*s.quota))}
     ${kpi(I.wallet,peso(st.left),'−'+peso(pt)+' today','down','Budget remaining')}${kpi(I.clock,'6d 4h','','','Left · closes Nov 18, 2:32 PM')}</div>
     <div class="card chartc" id="chartCard">${chartCard()}</div>`;
 }
@@ -479,19 +481,19 @@ function vBuild(s){
     <aside class="preview"><div class="ph2">${I.eye}Live preview, exactly what students see</div><div id="bPrev">${formPreview(s,false)}</div></aside></div>
   <div class="bbar"><span class="ok">${I.check}Saved · ${s.q.length} questions</span><button class="btn dark pill" data-act="toFund">Continue to funding ${I.arrow}</button></div>`;
 }
-function vFund(s){const b=s.rate*s.quota,f=Math.round(b*.05);
+function vFund(s){const b=s.rate*s.quota,f=feeOf(s);
   return `<div class="fund"><div style="min-width:0"><section class="card pad"><h2 class="h">Rate, quota and deadline</h2><p class="muted" style="margin:0">These are written into the contract and can't change after funding.</p>
-      <div class="f3"><div class="fld"><label for="fRate">Pay per valid response</label><input class="inp" id="fRate" data-num="rate" type="number" min="1" step="1" value="${s.rate}"></div>
+      <div class="f3"><div class="fld"><label for="fRate">Pay per valid response (tBNB)</label><input class="inp" id="fRate" data-num="rate" type="number" inputmode="decimal" min="0.0001" step="0.0001" value="${+(s.rate*0.0001).toFixed(4)}"></div>
         <div class="fld"><label for="fQuota">Responses needed</label><input class="inp" id="fQuota" data-num="quota" type="number" min="1" step="1" value="${s.quota}"></div>
         <div class="fld"><label for="fDl">Deadline</label><input class="inp" id="fDl" data-in="sDeadline" type="date" value="${s.deadline}"></div></div><div class="err" id="fundErr"></div></section>
     <div class="cc"><section class="card"><h4><span style="color:var(--green)">${I.shield}</span>The contract can</h4><p>Pay only ${peso(s.rate)} per response, to verified respondents of this survey, once each, within the quota.</p><p>Return the unused budget to you at the deadline, or when the quota is met.</p></section>
       <section class="card"><h4><span style="color:var(--red)">${I.x}</span>The contract can't</h4><p>Send your budget anywhere except respondents or back to you.</p><p>Change the rate, quota, deadline or questions. A pause switch stops all payments.</p></section></div>
     <button class="btn ghost" style="margin-top:14px" data-act="toBuild">${I.back}Back to questions</button></div>
-    <aside class="card pad sum"><div class="line"><span>Budget (${peso(s.rate)} × ${s.quota})</span><span id="sB">${peso(b)}</span></div><div class="line"><span>Flat fee</span><span id="sF">${peso(f)}</span></div>
+    <aside class="card pad sum"><div class="line"><span id="sBl">Budget (${peso(s.rate)} × ${s.quota})</span><span id="sB">${peso(b)}</span></div><div class="line"><span id="sFl">Fee (${FEE_TXT} × ${s.quota})</span><span id="sF">${peso(f)}</span></div>
       <div class="tot"><span style="font-weight:600">You deposit</span><b id="sD">${peso(b+f)}</b></div><p class="hint" style="margin:8px 0 0">Paid in tBNB from ${shortW(MY_WALLET)}. The fee isn't refundable; unused budget is.</p>
       <button class="fundbtn" data-act="openMM"><span class="fx">${fx}</span><span id="fundLbl">Fund survey ${peso(b+f)}</span></button>
       <p class="fundnote">Opens MetaMask to approve and lock the budget in one step.</p></aside></div>`}
-function mmModal(){const s=SV(S.sid),b=s.rate*s.quota,f=Math.round(b*.05);
+function mmModal(){const s=SV(S.sid),b=s.rate*s.quota,f=feeOf(s);
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="MetaMask confirmation"><div class="scr" data-act="mmReject"></div><div class="mm">
     <div class="hd"><span class="fx">${fx}</span>MetaMask<span class="net">BSC Testnet</span></div>
     <div class="bd"><div class="hint">ResFunder wants to lock your survey budget</div><div class="amt">${peso(b+f)}</div>
@@ -499,7 +501,7 @@ function mmModal(){const s=SV(S.sid),b=s.rate*s.quota,f=Math.round(b*.05);
     <div class="ft"><button class="btn" data-act="mmReject">Reject</button><button class="btn dark" data-act="mmConfirm">Confirm</button></div></div></div>`}
 function qrCells(){let h='';const fin=(r,c)=>{const inF=(a,b)=>r>=a&&r<a+7&&c>=b&&c<b+7,loc=(a,b)=>{const x=r-a,y=c-b;return x===0||x===6||y===0||y===6||(x>=2&&x<=4&&y>=2&&y<=4)};if(inF(0,0))return loc(0,0);if(inF(0,14))return loc(0,14);if(inF(14,0))return loc(14,0);return null};
   for(let r=0;r<21;r++)for(let c=0;c<21;c++){const f=fin(r,c);h+=`<i class="${(f!==null?f:((r*7+c*13+r*c)%5<2))?'b':''}"></i>`}return h}
-function vLiveShare(s){const b=s.rate*s.quota,f=Math.round(b*.05);
+function vLiveShare(s){const b=s.rate*s.quota,f=feeOf(s);
   return `<div class="lockbar">${I.lock}<span><b>Budget locked · ${peso(b+f)} in the contract</b><br><span style="font-size:13.5px">${peso(b)} for answers and ${peso(f)} fee. Your survey is live.</span></span><span class="mono">Tx 0x7a3f0c…e2c91e</span></div>
   <div class="lockrow"><div>${I.lock}Rate<b>${peso(s.rate)} per answer</b></div><div>${I.lock}Quota<b>${s.quota} responses</b></div><div>${I.lock}Deadline<b>${fmtDate(s.deadline)}</b></div><div>${I.lock}Questions<b>${s.q.length} locked</b></div></div>
   <div class="share"><section class="card pad"><h2 class="h">Share the link</h2><p class="muted" style="margin:0">Students open it on their phone and verify a school email before answering.</p>
@@ -525,7 +527,7 @@ function vFinance(){const t=S.finsub,names={wallet:'Wallet',payouts:'Payouts',re
     body=`<p class="fintro">Money paid to you for answering other thesis groups' surveys. <button class="btn ghost" style="padding:0;font-size:inherit;text-decoration:underline" data-nav="answer">Answer more surveys</button></p>
     <div class="tbox"><table class="t"><thead><tr><th>Survey</th><th>Amount</th><th>Status</th><th>Transaction</th><th>When</th></tr></thead><tbody>${MYPAY.map(p=>`<tr class="${p.fresh?'new':''}"><td><div class="nm"><b style="font-weight:500">${esc(p.title)}</b><small class="p">${esc(p.group)}</small></div></td><td>${p.st==='no'?'0 tBNB':peso(p.amt)}</td><td><span class="tp ${stl[p.st][0]}">${stl[p.st][1]}</span></td><td class="mono">${p.tx}</td><td class="muted">${p.when}</td></tr>`).join('')}</tbody></table></div>
     <div class="tfoot"><span>${MYPAY.length} surveys answered · ${peso(earned())} earned</span></div>`}
-  else body=`<p class="fintro">Unused budget returned to you when your surveys closed. The 5% fee isn't refunded.</p>
+  else body=`<p class="fintro">Unused budget returned to you when your surveys closed. The flat fee per response isn't refunded.</p>
     <div class="tbox"><table class="t"><thead><tr><th>Survey</th><th>Closed</th><th>Paid out</th><th>Refunded</th><th>Transaction</th></tr></thead><tbody>
     ${refundRows().map(r=>`<tr class="${r.fresh?'new':''}"><td>${esc(r.title)}</td><td>${r.when}</td><td>${peso(r.paid)}</td><td>${peso(r.amt)}</td><td class="mono">${r.tx}</td></tr>`).join('')}</tbody></table></div>`;
   return header('<span>Finance</span>',names[t],'')+tabs+body}
@@ -618,7 +620,7 @@ function vSettings(){const M=me();
       <div class="srow"><span><b>New surveys to answer</b><small>When another thesis group opens a paid survey you can answer.</small></span><label class="switch"><input type="checkbox" checked aria-label="New surveys to answer"><span></span></label></div></section></div>`}
 function vHelp(){const f=[['How does screening decide who gets paid?','Code checks run first (empty, gibberish, duplicate, too fast, same option repeated). Then the AI labels each short answer twice. Published rules decide: Pay, Review or Don\'t pay. The AI can only send a response to Review; it can\'t block payment.'],
   ['What happens if nobody reviews a response?','After 24 hours it pays automatically and shows as Timeout in the decision log.'],['Can a respondent appeal?','Yes, once, after a Don\'t pay. You decide the appeal in the review queue, and that decision is final.'],
-  ['What does the 5% fee cover?','Running the screening and the contract. It isn\'t refunded when you close a survey; unused budget is.'],['Is this real money?','No. The demo runs on BSC Testnet with tBNB test tokens.']];
+  ['What does the fee cover?','A flat fee per response ('+FEE_TXT+') covers the network cost of each payment decision and running the screening. It isn\'t refunded when you close a survey; unused budget is.'],['Is this real money?','No. The demo runs on BSC Testnet with tBNB test tokens.']];
   return header('','Help and support',`<a class="btn" href="${FLOWS}" target="_blank" rel="noopener">View user flows</a>`)+`<section class="card pad faq" style="max-width:820px">${f.map((x,i)=>`<details ${i?'':'open'}><summary>${x[0]}${I.down.replace('<svg','<svg style="width:16px;height:16px;flex:none"')}</summary><p>${x[1]}</p></details>`).join('')}</section>`}
 
 /* ================= student view (respondent phone) ================= */
@@ -774,8 +776,8 @@ document.addEventListener('click',e=>{
 });
 function refreshLog(){const b=document.getElementById('logBody');if(b)b.innerHTML=logBody();const x=document.getElementById('exportBtn');if(x)x.innerHTML=exportLabel()}
 function refreshPlot(){const w=document.getElementById('plotWrap');if(w)w.innerHTML=plot()}
-function refreshFund(){const s=SV(S.sid),b=s.rate*s.quota,f=Math.round(b*.05),set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
-  set('sB',peso(b));set('sF',peso(f));set('sD',peso(b+f));set('fundLbl','Fund survey '+peso(b+f));setErr('fundErr','')}
+function refreshFund(){const s=SV(S.sid),b=s.rate*s.quota,f=feeOf(s),set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+  set('sBl','Budget ('+peso(s.rate)+' × '+s.quota+')');set('sFl','Fee ('+FEE_TXT+' × '+s.quota+')');set('sB',peso(b));set('sF',peso(f));set('sD',peso(b+f));set('fundLbl','Fund survey '+peso(b+f));setErr('fundErr','')}
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.in==='crq'){S.crq=t.value;const L=document.getElementById('crqList'),C=CLOSED[S.sid];if(L&&C)L.innerHTML=crqList(C.q2.filter(([a])=>!t.value.trim()||a.toLowerCase().includes(t.value.trim().toLowerCase())),C.paid);}if(t.dataset&&t.dataset.in==='authPaste'){S.auth.pasteV=t.value;const er=document.getElementById('aPasteErr');if(er)er.textContent='';}if(t.dataset&&t.dataset.pft){pf()[t.dataset.pft]=t.value;const er=document.getElementById('aPfErr');if(er)er.textContent='';}});
 document.addEventListener('change',e=>{const t=e.target;if(!t.dataset)return;if(t.dataset.pf){pf()[t.dataset.pf]=t.value;const k=t.dataset.pf;render();const o=document.querySelector('[data-pft="'+k+'O"]');if(o&&t.value==='other')o.focus();else{const r=document.querySelector('input[data-pf="'+k+'"][value="'+t.value+'"]');if(r)r.focus();}}if(t.dataset.pfc){pf()[t.dataset.pfc]=t.checked;const er=document.getElementById('aPfErr');if(er)er.textContent='';}});
 document.addEventListener('input',e=>{const el=e.target,d=el.dataset,s=SV(S.sid);
@@ -787,7 +789,7 @@ document.addEventListener('input',e=>{const el=e.target,d=el.dataset,s=SV(S.sid)
     else if(k==='jLink'){S.jLink=v;setErr('jErr','')}
     else if(k==='rq3'){S.rq3=v;const st=el.selectionStart;render();const n=document.getElementById('rq3');if(n){n.focus();try{n.setSelectionRange(st,st)}catch(err){}}}
     return}
-  if(d.num){s[d.num]=Math.max(0,Math.floor(+el.value||0));refreshFund();return}
+  if(d.num){s[d.num]=d.num==='rate'?Math.max(0,Math.round((+el.value||0)*10000)):Math.max(0,Math.floor(+el.value||0));refreshFund();return}
   if(d.bq!=null){s.q[+d.bq].t=el.value;refreshPrev();return}
   if(d.bopt!=null){s.q[+d.bopt].opts[+d.j]=el.value;refreshPrev();return}
   if(d.brow!=null){s.q[+d.brow].rows[+d.j]=el.value;refreshPrev();return}
@@ -814,12 +816,15 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.matches&&e.target.matches('input.inp')){const m={aEmail:'authEmail',aCode:'authVerify',jLink:'openLink'}[e.target.id];if(m){e.preventDefault();act(m)}}
 });
 function fromHash(){const h=(location.hash||'').slice(1);if(!h||!S.authed)return;if(h.startsWith('survey-')){const [,sid,tab]=h.split('-');if(SV(sid)){S.page='survey';S.sid=sid;S.stab=tab||defTab(sid)}}else if(/^(dashboard|surveys|answer|settings|help)$/.test(h))S.page=h;else if(/^finance-(wallet|payouts|refunds)$/.test(h))nav(h);else if(h.startsWith('surveys-'))S.page='surveys'}
-try{window.addEventListener('hashchange',()=>{fromHash();render()})}catch(e){}
+/* /#how, /#rules and /#start from the other pages scroll to that landing section */
+function lpAnchor(){if(S.authed||!S.landing)return;const t=document.getElementById({how:'lp-how',rules:'lp-rules',start:'lp-start'}[(location.hash||'').slice(1)]||'');if(t)t.scrollIntoView()}
+try{window.addEventListener('hashchange',()=>{fromHash();render();lpAnchor()})}catch(e){}
 /* Phone layout turns table rows into cards; each cell gets its column name as a label */
 const labelTables=()=>document.querySelectorAll('table.t').forEach(t=>{const h=[...t.querySelectorAll('thead th')].map(th=>th.textContent.trim());
   t.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{if(h[i]&&!td.hasAttribute('data-label'))td.setAttribute('data-label',h[i])}))});
 try{new MutationObserver(labelTables).observe(document.getElementById('root'),{childList:true,subtree:true})}catch(e){}
 try{fromHash()}catch(e){}
+try{setTimeout(lpAnchor,0)}catch(e){}
 render();
 /* ================= results for closed surveys ================= */
 const CLOSED={spaces:{q1:[46,29,21,16],quota:120,paid:112,closed:'Oct 30, 2026',
@@ -889,7 +894,7 @@ function vLanding(){
     <div><span class="lp-tag warn">${I.clock}Review</span><p>Two weak signals, an unclear or non-answer label, disagreeing runs, a failed AI call or an injection flag. The researcher sees the AI reason.</p></div>
     <div><span class="lp-tag bad">${I.x}Don't pay</span><p>Only a code-confirmed failure: an empty answer, a copy of another response, or keyboard mash. Questions that allow short answers skip the empty and gibberish checks.</p></div></div></section>
 
-  <section class="lp-cta"><div><h2>Which one are you today?</h2><p>Researchers publish and fund surveys. Students answer them and get paid. One account and wallet does both.</p></div>${start('end')}</section>
+  <section class="lp-cta" id="lp-start"><div><h2>Which one are you today?</h2><p>Researchers publish and fund surveys. Students answer them and get paid. One account and wallet does both.</p></div>${start('end')}</section>
 
   <footer class="lp-foot"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span><p>Fund research. Pay honest answers. Built for BCC 2026. Answers and emails stay off-chain; only wallet addresses and reason hashes go on-chain. Handled under the Data Privacy Act of 2012.</p></footer>
   </div>`;
