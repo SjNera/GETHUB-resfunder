@@ -1,0 +1,21 @@
+{
+  "title": "Student Study Habits and Online Learning",
+  "description": "A short survey on how students study and learn online. Takes about 5 minutes.",
+  "questions": [
+    { "id": "q1", "type": "scale", "text": "I find it easy to focus during online classes.", "required": true, "min": 1, "max": 5 },
+    { "id": "q2", "type": "scale", "text": "I keep a regular study schedule.", "required": true, "min": 1, "max": 5 },
+    { "id": "q3", "type": "scale", "text": "I have a quiet place to study at home.", "required": true, "min": 1, "max": 5 },
+    { "id": "q4", "type": "scale", "text": "My internet connection is reliable enough for school work.", "required": true, "min": 1, "max": 5 },
+    { "id": "q5", "type": "scale", "text": "I feel confident about my grades this semester.", "required": true, "min": 1, "max": 5 },
+    {
+      "id": "q6",
+      "type": "multiple_choice",
+      "text": "How many hours do you study outside class on a typical school day?",
+      "required": true,
+      "options": ["Less than 1 hour", "1 to 2 hours", "3 to 4 hours", "More than 4 hours"]
+    },
+    { "id": "q7", "type": "open_ended", "text": "What is the biggest challenge you face when studying online?", "required": true, "allowShort": false },
+    { "id": "q8", "type": "open_ended", "text": "Describe one study method that works well for you and why.", "required": true, "allowShort": false },
+    { "id": "q9", "type": "open_ended", "text": "Any other comments?", "required": false, "allowShort": true }
+  ]
+}
