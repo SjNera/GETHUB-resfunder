@@ -1,0 +1,187 @@
+import { ArrowRight, Check, Clock3, X } from "lucide-react";
+import Link from "next/link";
+import { ActivityStack } from "@/components/landing/activity-stack";
+import { Orbit } from "@/components/landing/orbit";
+import { ButtonLink } from "@/components/ui/button";
+
+const facts = ["BNB Smart Chain testnet", "One verified escrow contract", "Answers labelled twice by an LLM", "Flat 5% fee", "One payout per verified student"];
+
+const steps = [
+  { n: "01", who: "Researcher", title: "Build survey", body: "Google Forms-style builder, five question types." },
+  { n: "02", who: "Researcher", title: "Fund and lock", body: "Rate × quota + 5% fee, locked in escrow." },
+  { n: "03", who: "Respondent", title: "Verify", body: "School email. One payout per student." },
+  { n: "04", who: "Respondent", title: "Answer", body: "Consent, answers, wallet address." },
+  { n: "05", who: "Code", title: "Code checks", body: "Speed, straight-lining, duplicate text." },
+  { n: "06", who: "AI", title: "AI label", body: "Labelled twice; flags injection. Can only escalate." },
+  { n: "07", who: "Rule engine", title: "Decide", body: "Plain code turns signals into Pay, Review or Don't pay." },
+];
+
+export default function Home() {
+  return (
+    <>
+      {/* HERO — Deflexai layout */}
+      <section className="relative isolate overflow-hidden px-4 pb-16 pt-14 sm:pb-24 sm:pt-20">
+        <Orbit />
+        <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
+          <div className="rise-in flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-brand" />
+              BCC 2026 · AI Agents track
+            </span>
+            <span className="hidden text-border-strong sm:inline">|</span>
+            <span>Built on BNB Smart Chain</span>
+          </div>
+          <h1 className="display rise-in mt-6 text-[clamp(2.75rem,8vw,5.25rem)] [animation-delay:60ms]">
+            Fund research.
+            <br />
+            Pay honest answers.
+          </h1>
+          <p className="rise-in mt-6 max-w-[34rem] text-lg text-muted [animation-delay:120ms]">
+            Student researchers lock a small survey budget in a smart contract. Respondents are paid in seconds, but only
+            for answers that pass a transparent screening check.
+          </p>
+          <div className="rise-in mt-8 flex flex-wrap items-center justify-center gap-3 [animation-delay:180ms]">
+            <ButtonLink href="/dashboard" variant="primary" size="lg">
+              Fund a survey
+            </ButtonLink>
+            <ButtonLink href="/s/sleep-study" variant="outline" size="lg">
+              Answer the demo survey
+            </ButtonLink>
+          </div>
+        </div>
+        <div className="rise-in mx-auto mt-14 max-w-md [animation-delay:260ms]">
+          <ActivityStack />
+        </div>
+      </section>
+
+      {/* FACTS STRIP — instead of fake social proof */}
+      <section aria-label="Key facts" className="border-y border-border">
+        <ul className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-5 py-6 text-[15px] font-medium text-muted">
+          {facts.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+      </section>
+
+      {/* HOW IT WORKS — Liquid Brokers dark stage */}
+      <section id="how" className="scroll-mt-28 px-3 pt-16 sm:px-4 sm:pt-24">
+        <div className="relative isolate mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] bg-stage px-5 py-16 text-stage-fg sm:px-10 sm:py-20">
+          {/* the orb */}
+          <div aria-hidden className="pointer-events-none absolute left-1/2 top-[58%] -z-10 size-[38rem] -translate-x-1/2 -translate-y-1/2">
+            <div className="motion-safe-only absolute inset-0 animate-[orb-drift_48s_linear_infinite] rounded-full opacity-90 blur-2xl [background:radial-gradient(circle_at_30%_30%,#ffd29c_0%,#ff8a1c_22%,rgba(255,138,28,0.35)_42%,transparent_62%),radial-gradient(circle_at_72%_68%,rgba(120,140,255,0.35)_0%,transparent_40%)]" />
+            <div className="absolute inset-[18%] rounded-full [background:radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.35),rgba(255,255,255,0)_40%)]" />
+          </div>
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-sm font-medium uppercase tracking-[0.08em] text-[#ffb36b]">How it works</p>
+            <h2 className="display mt-3 text-[clamp(2rem,5vw,3.5rem)]">The AI labels. Only the rule engine decides who gets paid.</h2>
+            <p className="mx-auto mt-4 max-w-xl text-[17px] text-white/70">
+              The LLM answers one narrow question: is this a non-answer? It can only send a response to a person. Plain,
+              published code makes every payment decision.
+            </p>
+          </div>
+          <ol className="mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {steps.map((s) => (
+              <li
+                key={s.n}
+                className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl [@media(prefers-reduced-transparency:reduce)]:bg-[#1c1c1c] [@media(prefers-reduced-transparency:reduce)]:backdrop-blur-none"
+              >
+                <div className="flex items-center justify-between text-xs text-white/55">
+                  <span className="nums font-mono">{s.n}</span>
+                  <span>{s.who}</span>
+                </div>
+                <h3 className="heading mt-6 text-lg">{s.title}</h3>
+                <p className="mt-1 text-sm text-white/65">{s.body}</p>
+              </li>
+            ))}
+            <li className="flex flex-col justify-between rounded-3xl bg-brand p-5 text-brand-fg">
+              <span className="text-xs font-medium opacity-70">Outcome</span>
+              <div className="mt-6 flex flex-col gap-1.5 text-[15px] font-semibold">
+                <span className="flex items-center gap-2"><Check className="size-4" strokeWidth={3} /> Pay, in seconds</span>
+                <span className="flex items-center gap-2"><Clock3 className="size-4" strokeWidth={3} /> Review, max 24 h</span>
+                <span className="flex items-center gap-2"><X className="size-4" strokeWidth={3} /> Don&apos;t pay, appeal once</span>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      {/* AUDIENCES — Finyon big numbers */}
+      <section className="mx-auto max-w-6xl px-5 pt-20 sm:pt-28">
+        <div className="max-w-2xl">
+          <h2 className="display text-[clamp(2rem,5vw,3.5rem)]">Built for thesis budgets, not research labs.</h2>
+          <p className="mt-4 text-lg text-muted">
+            One flat fee, known before signing. Incumbent panels charge 20–40% and price out a ₱1,500 thesis survey.
+          </p>
+        </div>
+        <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-0">
+          {[
+            { big: "₱1,575", label: "Researchers", body: "150 answers at ₱10, plus the 5% fee. Unused budget comes back automatically at close." },
+            { big: "₱10", label: "Respondents", body: "Paid in seconds for an honest answer, with a BscScan receipt. Taglish and short answers are fine." },
+            { big: "100%", label: "Advisers", body: "Every decision is logged with its reason, the rubric version and the model version." },
+          ].map((a, i) => (
+            <div key={a.label} className={i > 0 ? "sm:border-l sm:border-border-strong sm:pl-8" : "sm:pr-8"}>
+              <p className="display nums text-6xl sm:text-7xl">{a.big}</p>
+              <p className="mt-4 font-semibold">{a.label}</p>
+              <p className="mt-1 max-w-xs text-muted">{a.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* BENEFIT OF THE DOUBT */}
+      <section className="mx-auto max-w-6xl px-5 pt-20 sm:pt-28">
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            {
+              tone: "bg-pay-soft text-pay",
+              icon: <Check className="size-4" strokeWidth={3} />,
+              title: "Pay",
+              body: "No hard failure, at most one weak signal, and the AI label is valid — or the question allows short answers.",
+            },
+            {
+              tone: "bg-review-soft text-review",
+              icon: <Clock3 className="size-4" strokeWidth={3} />,
+              title: "Review",
+              body: "Two weak signals, an unclear label, disagreeing runs or an injection flag. Unresolved after 24 h? The respondent is paid.",
+            },
+            {
+              tone: "bg-dontpay-soft text-dontpay",
+              icon: <X className="size-4" strokeWidth={3} />,
+              title: "Don't pay",
+              body: "Only a code-confirmed failure: an empty answer, a copy of another response, or keyboard mash. Appeal once.",
+            },
+          ].map((c) => (
+            <div key={c.title} className="rounded-3xl border border-border bg-surface p-6">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium ${c.tone}`}>
+                {c.icon}
+                {c.title}
+              </span>
+              <p className="mt-4 text-[15px] text-muted">{c.body}</p>
+            </div>
+          ))}
+        </div>
+        <Link href="/rubric" className="mt-6 inline-flex items-center gap-1.5 font-medium text-brand-ink hover:underline">
+          Read the full public rubric <ArrowRight className="size-4" />
+        </Link>
+      </section>
+
+      {/* FINAL CTA */}
+      <section className="mx-auto max-w-6xl px-5 pt-20 sm:pt-28">
+        <div className="flex flex-col items-start justify-between gap-6 rounded-[2.5rem] border border-border bg-surface p-8 sm:flex-row sm:items-center sm:p-12">
+          <div>
+            <h2 className="display text-[clamp(1.75rem,4vw,2.75rem)]">See the whole flow in three minutes.</h2>
+            <p className="mt-2 text-muted">Answer as a student, then switch to the researcher&apos;s side and decide a Review case.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <ButtonLink href="/s/sleep-study" variant="dark" size="lg">
+              Answer as a student
+            </ButtonLink>
+            <ButtonLink href="/surveys/sleep-study" variant="outline" size="lg">
+              Open the researcher view
+            </ButtonLink>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
