@@ -21,6 +21,12 @@ The web app runs in **demo mode** (every transaction simulated) until these step
    NEXT_PUBLIC_TOKEN_ADDRESS=0x...
    ```
 
+## The mock peso token
+
+`MockToken.sol` is a plain ERC-20 named **tPHP** with 18 decimals, where 1 tPHP stands for ₱1. It has no value.
+The demo survey pays ₱10 per answer (`10 × 10^18` units) and locks ₱1,575 (₱1,500 + ₱75 fee).
+Mint test tPHP to the researcher's wallet so they can fund a survey. Gas is still paid in testnet BNB.
+
 ## What the frontend calls today
 
 The stub ABI in `web/src/lib/web3/abi/surveyEscrow.ts` assumes:
@@ -31,7 +37,7 @@ The stub ABI in `web/src/lib/web3/abi/surveyEscrow.ts` assumes:
 | `createSurvey` | `bytes32 surveyHash, uint256 rate, uint256 quota, uint64 deadline` (unix seconds) |
 | `closeSurvey` | `bytes32 surveyHash` |
 
-If the real signatures differ, update the stub **and** the call in `web/src/components/researcher/fund.tsx`.
+If the real signatures differ, update the stub **and** the calls in `web/src/lib/web3/escrow.ts`.
 The 5% fee is computed with integer division (`budget * 500 / 10000`, rounded down); the contract must round
 the same way, or the approval amount won't match.
 

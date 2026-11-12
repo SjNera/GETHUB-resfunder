@@ -34,8 +34,8 @@
 
   --stage: #0e0e0e; /* the dark "How it works" stage stays Onyx in both themes */
   --stage-fg: #f2f1ee;
-  --glass: rgb(250 250 248 / 0.72);
-  --glass-edge: rgb(255 255 255 / 0.7);
+  --glass: rgb(250 250 248 / 0.64);
+  --glass-edge: rgb(255 255 255 / 0.75);
   --ring: var(--brand);
   --shadow-float: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 8px 30px -12px rgb(18 18 18 / 0.18), 0 2px 6px -2px rgb(18 18 18 / 0.06);
 }
@@ -163,12 +163,33 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--border);
+    border-top-color: var(--glass-edge); /* bright top edge: light catching the material */
     box-shadow: var(--shadow-float);
+  }
+  /* Text on glass: a touch darker and heavier than on solid surfaces (vibrancy) */
+  .material .on-glass {
+    color: var(--fg);
+    font-weight: 500;
+    letter-spacing: 0.005em;
+  }
+
+  /* Soft scroll-edge under floating bottom bars, instead of a hard divider */
+  .scroll-edge-bottom {
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent 0%, var(--bg) 70%);
+  }
+
+  /* Pushed screens enter from the right (Back returns the same way) */
+  .page-in {
+    animation: page-in 240ms var(--ease-out) backwards;
+  }
+  .page-back {
+    animation: page-back 240ms var(--ease-out) backwards;
   }
 
   /* Press feedback on pointer-down for anything pressable */
   .pressable {
-    transition: transform 120ms var(--ease-out);
+    transition: transform 100ms var(--ease-out);
   }
   .pressable:active:not(:disabled) {
     transform: scale(0.97);
@@ -232,6 +253,66 @@
   }
 }
 
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes page-back {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in,
+  .page-back {
+    animation: fade-in 200ms ease backwards;
+  }
+}
+
+/* Glass/3D surfaces arrive as material: blur + scale together, not a plain fade */
+.materialize {
+  animation: materialize 420ms var(--ease-out) backwards;
+}
+@keyframes materialize {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .materialize {
+    animation: fade-in 200ms ease backwards;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -244,7 +325,7 @@
 }
 
 .rise-in {
-  animation: rise-in 420ms var(--ease-out) both;
+  animation: rise-in 420ms var(--ease-out) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

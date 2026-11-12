@@ -6,95 +6,15 @@
 import { keccak256, toBytes } from "viem";
 import { screen } from "../rules/decide";
 import { surveyHash } from "../schema";
-import type { Answers, Decision, LlmLabel, Question, ResponseRecord, Survey } from "../types";
+import { breakdown } from "../fees";
+import { hardcodedSurvey, sleepQuestions } from "../survey/hardcoded";
+import type { Answers, Decision, LlmLabel, ResponseRecord, Survey } from "../types";
 import { fakeAddress, fakeTxHash } from "./ids";
 import { MOCK_MODEL_VERSION, mockLabelTwice } from "./mock-llm";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
-
-export const DEMO_SURVEY_ID = "sleep-study";
-export const DEMO_RESEARCHER = "Thesis Group 7 · BS Psychology";
-
-export const sleepQuestions: Question[] = [
-  {
-    id: "q-year",
-    type: "multiple_choice",
-    title: "What year level are you in?",
-    required: true,
-    options: ["1st year", "2nd year", "3rd year", "4th year"],
-  },
-  {
-    id: "q-hours",
-    type: "multiple_choice",
-    title: "On school nights, how many hours do you usually sleep?",
-    required: true,
-    options: ["Less than 5 hours", "5–6 hours", "7–8 hours", "More than 8 hours"],
-  },
-  {
-    id: "q-phone",
-    type: "linear_scale",
-    title: "I use my phone in bed before sleeping.",
-    required: true,
-    minLabel: "Never",
-    maxLabel: "Every night",
-  },
-  {
-    id: "q-late",
-    type: "linear_scale",
-    title: "I stay up late to finish school requirements.",
-    required: true,
-    minLabel: "Never",
-    maxLabel: "Every night",
-  },
-  {
-    id: "q-rested",
-    type: "linear_scale",
-    title: "I feel rested during morning classes.",
-    required: true,
-    minLabel: "Never",
-    maxLabel: "Always",
-  },
-  {
-    id: "q-grades",
-    type: "linear_scale",
-    title: "My grades suffer in weeks when I sleep less.",
-    required: true,
-    minLabel: "Strongly disagree",
-    maxLabel: "Strongly agree",
-  },
-  {
-    id: "q-nap",
-    type: "linear_scale",
-    title: "I nap during the day to catch up on sleep.",
-    required: true,
-    minLabel: "Never",
-    maxLabel: "Every day",
-  },
-  {
-    id: "q-devices",
-    type: "checkboxes",
-    title: "Which do you use in the hour before you sleep?",
-    required: false,
-    options: ["Phone", "Laptop", "Tablet", "TV", "None of these"],
-  },
-  {
-    id: "q-why",
-    type: "paragraph",
-    title: "What usually keeps you up late on school nights?",
-    description: "A sentence or two is enough. English, Filipino or Taglish are all fine.",
-    required: true,
-    allowShort: false,
-  },
-  {
-    id: "q-else",
-    type: "short_answer",
-    title: "Anything else you'd like the researchers to know?",
-    required: false,
-    allowShort: true,
-  },
-];
 
 const VALID = [
   "Usually group projects. We can only meet online after everyone gets home, so calls start around 9pm.",
@@ -193,28 +113,20 @@ export function respondentHash(surveyId: string, email: string): `0x${string}` {
   return keccak256(toBytes(`${surveyId}:${email.trim().toLowerCase()}`));
 }
 
-export function buildSeed(now = Date.now()) {
+/** Sample data: the hardcoded survey, funded, with 60 screened responses. */
+export function buildSample(now = Date.now()) {
   const rand = seededRandom(42);
   const launched = now - 8 * DAY;
 
   const sleep: Survey = {
-    id: DEMO_SURVEY_ID,
-    title: "Sleep, screen time and study habits of college students",
-    description:
-      "We're a BS Psychology thesis group studying how late-night screen use relates to sleep and grades. Takes about 4 minutes. Your answers stay anonymous.",
-    researcher: DEMO_RESEARCHER,
-    institution: "University of Makati",
-    questions: sleepQuestions,
+    ...hardcodedSurvey(launched - DAY),
     status: "live",
-    rateCentavos: 1000,
-    quota: 150,
     deadline: new Date(now + 6 * DAY + 5 * HOUR).toISOString(),
-    estimatedMinutes: 4,
-    createdAt: new Date(launched - DAY).toISOString(),
+    owner: "thesis.group7@umak.edu.ph",
   };
   sleep.funding = {
     surveyHash: surveyHash(sleep),
-    approveTx: fakeTxHash(),
+    depositUnits: breakdown(BigInt(sleep.rateUnits), sleep.quota).deposit.toString(),
     createTx: fakeTxHash(),
     fundedAt: new Date(launched).toISOString(),
     researcherWallet: fakeAddress(),
@@ -349,117 +261,15 @@ export function buildSeed(now = Date.now()) {
     });
   }
 
-  const commute: Survey = {
-    id: "commute-costs",
-    title: "Daily commuting costs of UMak students",
-    description: "How much students spend and how long they travel to campus each day.",
-    researcher: DEMO_RESEARCHER,
-    institution: "University of Makati",
-    status: "draft",
-    rateCentavos: 1000,
-    quota: 100,
-    deadline: new Date(now + 14 * DAY).toISOString(),
-    estimatedMinutes: 3,
-    createdAt: new Date(now - 2 * HOUR).toISOString(),
-    questions: [
-      {
-        id: "c-mode",
-        type: "multiple_choice",
-        title: "How do you usually get to campus?",
-        required: true,
-        options: ["Jeepney", "Bus", "MRT/LRT", "Tricycle", "Walk", "Private vehicle"],
-      },
-      {
-        id: "c-cost",
-        type: "short_answer",
-        title: "About how much do you spend on fare per day (₱)?",
-        required: true,
-        allowShort: true,
-      },
-      {
-        id: "c-stress",
-        type: "linear_scale",
-        title: "My commute affects how well I can study.",
-        required: true,
-        minLabel: "Not at all",
-        maxLabel: "A lot",
-      },
-      {
-        id: "c-story",
-        type: "paragraph",
-        title: "Describe a typical commute on a school day.",
-        required: true,
-        allowShort: false,
-      },
-    ],
-  };
-
-  const library: Survey = {
-    id: "library-use",
-    title: "Library use after the return to face-to-face classes",
-    description: "A short pilot survey on how often students use the campus library.",
-    researcher: DEMO_RESEARCHER,
-    institution: "University of Makati",
-    status: "closed",
-    rateCentavos: 1500,
-    quota: 40,
-    deadline: new Date(now - 10 * DAY).toISOString(),
-    estimatedMinutes: 2,
-    createdAt: new Date(now - 30 * DAY).toISOString(),
-    questions: [
-      {
-        id: "l-often",
-        type: "multiple_choice",
-        title: "How often do you visit the library?",
-        required: true,
-        options: ["Weekly", "Monthly", "Rarely", "Never"],
-      },
-    ],
-  };
-  library.funding = {
-    surveyHash: surveyHash(library),
-    approveTx: fakeTxHash(),
-    createTx: fakeTxHash(),
-    fundedAt: new Date(now - 28 * DAY).toISOString(),
-    researcherWallet: fakeAddress(),
-    simulated: true,
-  };
-  library.closing = {
-    refundCentavos: 1500 * 6,
-    refundTx: fakeTxHash(),
-    closedAt: new Date(now - 10 * DAY).toISOString(),
-    simulated: true,
-  };
-
-  const libraryResponses: ResponseRecord[] = Array.from({ length: 34 }, (_, i) => {
-    const submitted = now - 27 * DAY + i * 4 * HOUR;
-    return {
-      id: `lr-${i + 1}`,
-      surveyId: library.id,
-      respondentHash: respondentHash(library.id, `lib${i}@umak.edu.ph`),
-      wallet: fakeAddress(),
-      answers: { "l-often": ["Weekly", "Monthly", "Rarely", "Never"][i % 4] },
-      startedAt: new Date(submitted - 60_000).toISOString(),
-      submittedAt: new Date(submitted).toISOString(),
-      decisions: [
-        {
-          outcome: "pay",
-          signals: [],
-          labels: [],
-          rubricVersion: "rubric-v1",
-          modelVersion: MOCK_MODEL_VERSION,
-          decidedBy: "rule_engine",
-          decidedAt: new Date(submitted + 3000).toISOString(),
-          payoutTx: fakeTxHash(),
-          simulated: true,
-        },
-      ],
-    };
-  });
-
-  const surveys = Object.fromEntries([sleep, commute, library].map((s) => [s.id, s]));
-  const allResponses = Object.fromEntries([...responses, ...libraryResponses].map((r) => [r.id, r]));
+  const surveys = { [sleep.id]: sleep };
+  const allResponses = Object.fromEntries(responses.map((r) => [r.id, r]));
   return { surveys, responses: allResponses };
+}
+
+/** Fresh core loop: just the hardcoded survey, unfunded, no responses. */
+export function buildFresh(now = Date.now()) {
+  const survey = hardcodedSurvey(now);
+  return { surveys: { [survey.id]: survey } as Record<string, Survey>, responses: {} as Record<string, ResponseRecord> };
 }
 
 export function current(r: ResponseRecord): Decision {

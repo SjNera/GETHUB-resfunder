@@ -5,14 +5,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { addressUrl, formatPeso, shortHash, txUrl } from "@/lib/format";
 
-export function Money({ centavos, className }: { centavos: number; className?: string }) {
-  return <span className={cn("nums", className)}>{formatPeso(centavos)}</span>;
+/** Peso amount from token units (mock tPHP, 18 decimals): "₱1,575". */
+export function Peso({ amount, className, max }: { amount: bigint | string; className?: string; max?: number }) {
+  return <span className={cn("nums whitespace-nowrap", className)}>{formatPeso(amount, max)}</span>;
 }
 
 export function SimulatedTag({ className }: { className?: string }) {
   return (
     <span
-      title="Demo mode: no contract is deployed yet, so this transaction is simulated."
+      title="Demo mode: the contract and agent wallet aren't connected yet, so this transaction is simulated."
       className={cn("rounded-full border border-dashed border-border-strong px-1.5 py-px text-[11px] font-medium uppercase tracking-wide text-muted", className)}
     >
       simulated

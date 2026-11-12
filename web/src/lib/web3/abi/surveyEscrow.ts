@@ -1,10 +1,9 @@
 /**
- * STUB — replace with the real ABI from Remix.
- *
- * After compiling SurveyEscrow.sol in Remix, open the Solidity compiler tab,
- * click "ABI" to copy it, and paste it below keeping `as const` so viem and
- * wagmi infer argument types. The argument order of createSurvey/closeSurvey
- * must match what lib/web3/useFundSurvey.ts sends.
+ * STUB — replace with the real ABI from Remix (Solidity compiler tab → ABI),
+ * keeping `as const`. The budget is the mock tPHP ERC-20: the researcher first
+ * approves the escrow for rate × quota + 5% fee, then createSurvey pulls it
+ * with transferFrom. Payouts and decisions are sent by the
+ * server agent wallet, not the browser, so they aren't called from here.
  */
 export const surveyEscrowAbi = [
   {
@@ -17,7 +16,7 @@ export const surveyEscrowAbi = [
       { name: "quota", type: "uint256" },
       { name: "deadline", type: "uint64" },
     ],
-    outputs: [{ name: "surveyId", type: "uint256" }],
+    outputs: [],
   },
   {
     type: "function",

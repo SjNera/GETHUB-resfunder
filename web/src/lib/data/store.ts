@@ -1,141 +1,148 @@
 "use client";
 
 /**
- * Demo data layer. Everything lives in the viewer's browser (localStorage),
- * so the demo works on any static host with no server and each viewer gets
+ * Demo data layer (frontend only). Everything lives in the viewer's browser
+ * (localStorage), so the demo runs on any static host and each viewer gets
  * their own copy.
  *
- * The action names match the planned repo interface (getSurvey,
- * submitResponse, resolveReview, appeal, closeSurvey…). When the backend
- * lands, these actions become fetch / Server Action calls and the pages
- * don't change.
+ * Backend seams:
+ * - submitResponse → lib/agent/submit.ts (later POST /api/responses, agent wallet pays)
+ * - fundSurvey / closeSurvey → called after lib/web3/escrow.ts sends the tx
  */
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { refundCentavos } from "../fees";
-import { screen } from "../rules/decide";
+import { pay, screenAndPay } from "../agent/submit";
+import { isAllowlisted } from "../allowlist";
+import { breakdown, refundUnits } from "../fees";
 import type { Answers, Decision, Outcome, Question, ResponseRecord, Session, Survey } from "../types";
-import { fakeAddress, fakeTxHash, newId } from "../demo/ids";
-import { MOCK_MODEL_VERSION, mockLabelTwice } from "../demo/mock-llm";
-import { buildSeed, current, DEMO_RESEARCHER, respondentHash } from "../demo/seed";
+import { fakeAddress, newId } from "../demo/ids";
+import { buildFresh, buildSample, current, respondentHash } from "../demo/seed";
 
 const DAY = 24 * 60 * 60 * 1000;
 
 export type DemoWallet = { address: `0x${string}`; simulated: true } | null;
+export type DataMode = "fresh" | "sample";
 
 type State = {
   ready: boolean;
+  mode: DataMode;
   surveys: Record<string, Survey>;
   responses: Record<string, ResponseRecord>;
   session: Session | null;
   demoWallet: DemoWallet;
+  /** Embedded onboarding */
+  guideHidden: boolean;
+  logVisited: boolean;
+  seenTips: Record<string, true>;
 };
 
 type Actions = {
   init: () => void;
-  reset: () => void;
-  // researcher
-  createSurvey: () => string;
-  updateSurvey: (id: string, patch: Partial<Pick<Survey, "title" | "description" | "rateCentavos" | "quota" | "deadline" | "estimatedMinutes">>) => void;
+  reset: (mode?: DataMode) => void;
+  // session
+  signIn: (email: string) => { ok: true } | { ok: false; error: string };
+  signOut: () => void;
+  // publish
+  updateSurvey: (id: string, patch: Partial<Pick<Survey, "title" | "description" | "rateUnits" | "quota" | "deadline" | "estimatedMinutes">>) => void;
   setQuestions: (id: string, questions: Question[]) => void;
-  fundSurvey: (id: string, funding: NonNullable<Survey["funding"]>) => void;
+  fundSurvey: (id: string, funding: Omit<NonNullable<Survey["funding"]>, "depositUnits">) => void;
   closeSurvey: (id: string, tx: `0x${string}`, simulated: boolean) => void;
   resolveReview: (responseId: string, outcome: Exclude<Outcome, "review">, note?: string) => void;
   resolveAppeal: (responseId: string, overturn: boolean, note?: string) => void;
-  // respondent
-  signIn: (email: string) => void;
-  signOut: () => void;
+  // answer
   submitResponse: (input: { surveyId: string; answers: Answers; wallet: `0x${string}`; startedAt: string }) => string;
   appeal: (responseId: string, message: string) => void;
-  // wallet (demo mode only)
+  // wallet (demo only)
   connectDemoWallet: () => void;
   disconnectDemoWallet: () => void;
+  // onboarding
+  setGuideHidden: (hidden: boolean) => void;
+  markLogVisited: () => void;
+  dismissTip: (id: string) => void;
   // timers
   runTimeouts: () => void;
 };
 
-const empty: State = { ready: false, surveys: {}, responses: {}, session: null, demoWallet: null };
+const onboarding = { guideHidden: false, logVisited: false, seenTips: {} as Record<string, true> };
 
 function withDecision(r: ResponseRecord, d: Decision): ResponseRecord {
   return { ...r, decisions: [...r.decisions, d] };
 }
 
-function payout(d: Decision): Decision {
-  return d.outcome === "pay" ? { ...d, payoutTx: fakeTxHash(), simulated: true } : d;
-}
-
 export const useDemo = create<State & Actions>()(
   persist(
     (set, get) => ({
-      ...empty,
+      ready: false,
+      mode: "fresh",
+      surveys: {},
+      responses: {},
+      session: null,
+      demoWallet: null,
+      ...onboarding,
 
       init: () => {
-        if (Object.keys(get().surveys).length === 0) {
-          set({ ...buildSeed() });
-        }
+        if (Object.keys(get().surveys).length === 0) set({ ...buildFresh(), mode: "fresh" });
         get().runTimeouts();
         set({ ready: true });
       },
 
-      reset: () => {
-        set({ ...buildSeed(), session: null, demoWallet: null, ready: true });
+      reset: (mode = get().mode) => {
+        const data = mode === "sample" ? buildSample() : buildFresh();
+        set({ ...data, mode, demoWallet: null, ...onboarding, logVisited: mode === "sample", ready: true });
       },
 
-      createSurvey: () => {
-        const id = newId("s");
-        const now = Date.now();
-        const survey: Survey = {
-          id,
-          title: "Untitled survey",
-          description: "",
-          researcher: DEMO_RESEARCHER,
-          institution: "University of Makati",
-          questions: [
-            { id: newId("q"), type: "paragraph", title: "", required: true, allowShort: false },
-          ],
-          status: "draft",
-          rateCentavos: 1000,
-          quota: 100,
-          deadline: new Date(now + 14 * DAY).toISOString(),
-          estimatedMinutes: 3,
-          createdAt: new Date(now).toISOString(),
-        };
-        set((s) => ({ surveys: { ...s.surveys, [id]: survey } }));
-        return id;
+      signIn: (email) => {
+        const e = email.trim().toLowerCase();
+        if (!isAllowlisted(e)) return { ok: false, error: "This email isn't on the allowlist for the demo." };
+        set({ session: { email: e, role: "respondent" } });
+        return { ok: true };
       },
+      signOut: () => set({ session: null }),
 
       updateSurvey: (id, patch) =>
         set((s) => {
           const survey = s.surveys[id];
-          if (!survey || (survey.funding && ("title" in patch || "description" in patch))) return s;
+          if (!survey || survey.funding) return s; // terms and questions lock at funding
           return { surveys: { ...s.surveys, [id]: { ...survey, ...patch } } };
         }),
 
       setQuestions: (id, questions) =>
         set((s) => {
           const survey = s.surveys[id];
-          if (!survey || survey.funding) return s; // locked once the hash is on-chain
+          if (!survey || survey.funding) return s;
           return { surveys: { ...s.surveys, [id]: { ...survey, questions } } };
         }),
 
       fundSurvey: (id, funding) =>
-        set((s) => ({ surveys: { ...s.surveys, [id]: { ...s.surveys[id], funding, status: "live" } } })),
+        set((s) => {
+          const survey = s.surveys[id];
+          const depositUnits = breakdown(BigInt(survey.rateUnits), survey.quota).deposit.toString();
+          return {
+            surveys: {
+              ...s.surveys,
+              [id]: { ...survey, funding: { ...funding, depositUnits }, status: "live", owner: s.session?.email ?? survey.owner },
+            },
+          };
+        }),
 
       closeSurvey: (id, tx, simulated) =>
         set((s) => {
           const survey = s.surveys[id];
-          const paid = Object.values(s.responses).filter((r) => r.surveyId === id && current(r).outcome === "pay").length;
-          // Open reviews are settled before the contract refunds (they pay by default).
-          const openReviews = Object.values(s.responses).filter((r) => r.surveyId === id && current(r).outcome === "review").length;
-          const refund = refundCentavos(survey.rateCentavos, survey.quota, paid + openReviews);
+          const rs = Object.values(s.responses).filter((r) => r.surveyId === id);
+          // Open reviews settle first and pay by default (benefit of the doubt).
+          const settled: Record<string, ResponseRecord> = {};
+          for (const r of rs) {
+            if (current(r).outcome === "review") {
+              settled[r.id] = withDecision(r, pay({ ...current(r), outcome: "pay", decidedBy: "timeout", decidedAt: new Date().toISOString(), payoutTx: undefined }));
+            }
+          }
+          const paid = rs.filter((r) => current(settled[r.id] ?? r).outcome === "pay").length;
+          const refund = refundUnits(BigInt(survey.rateUnits), survey.quota, paid);
           return {
+            responses: { ...s.responses, ...settled },
             surveys: {
               ...s.surveys,
-              [id]: {
-                ...survey,
-                status: "closed",
-                closing: { refundCentavos: refund, refundTx: tx, closedAt: new Date().toISOString(), simulated },
-              },
+              [id]: { ...survey, status: "closed", closing: { refundUnits: refund.toString(), refundTx: tx, closedAt: new Date().toISOString(), simulated } },
             },
           };
         }),
@@ -144,7 +151,7 @@ export const useDemo = create<State & Actions>()(
         set((s) => {
           const r = s.responses[responseId];
           if (!r || current(r).outcome !== "review") return s;
-          const d = payout({ ...current(r), outcome, decidedBy: "researcher", decidedAt: new Date().toISOString(), note, payoutTx: undefined });
+          const d = pay({ ...current(r), outcome, decidedBy: "researcher", decidedAt: new Date().toISOString(), note, payoutTx: undefined });
           return { responses: { ...s.responses, [responseId]: withDecision(r, d) } };
         }),
 
@@ -153,18 +160,10 @@ export const useDemo = create<State & Actions>()(
           const r = s.responses[responseId];
           if (!r?.appeal || r.appeal.status !== "pending") return s;
           const now = new Date().toISOString();
-          let next: ResponseRecord = {
-            ...r,
-            appeal: { ...r.appeal, status: overturn ? "overturned" : "upheld", resolvedAt: now },
-          };
-          if (overturn) {
-            next = withDecision(next, payout({ ...current(r), outcome: "pay", decidedBy: "appeal", decidedAt: now, note, payoutTx: undefined }));
-          }
+          let next: ResponseRecord = { ...r, appeal: { ...r.appeal, status: overturn ? "overturned" : "upheld", resolvedAt: now } };
+          if (overturn) next = withDecision(next, pay({ ...current(r), outcome: "pay", decidedBy: "appeal", decidedAt: now, note, payoutTx: undefined }));
           return { responses: { ...s.responses, [responseId]: next } };
         }),
-
-      signIn: (email) => set({ session: { email: email.trim().toLowerCase(), role: "respondent" } }),
-      signOut: () => set({ session: null }),
 
       submitResponse: ({ surveyId, answers, wallet, startedAt }) => {
         const { surveys, responses, session } = get();
@@ -172,20 +171,9 @@ export const useDemo = create<State & Actions>()(
         if (!survey || !session) throw new Error("Not signed in");
         const hash = respondentHash(surveyId, session.email);
         const existing = Object.values(responses).find((r) => r.surveyId === surveyId && r.respondentHash === hash);
-        if (existing) return existing.id; // one payout per verified student
-
-        const others = Object.values(responses).filter((r) => r.surveyId === surveyId);
-        const otherAnswers: Record<string, string[]> = {};
-        const labels: Record<string, ReturnType<typeof mockLabelTwice>> = {};
-        for (const q of survey.questions) {
-          if (q.type !== "short_answer" && q.type !== "paragraph") continue;
-          otherAnswers[q.id] = others.map((r) => (typeof r.answers[q.id] === "string" ? (r.answers[q.id] as string) : ""));
-          if (!q.allowShort) labels[q.id] = mockLabelTwice(typeof answers[q.id] === "string" ? (answers[q.id] as string) : "");
-        }
-        const submittedAt = new Date().toISOString();
-        const decision = payout(
-          screen({ questions: survey.questions, answers, startedAt, submittedAt, otherAnswers, labels, modelVersion: MOCK_MODEL_VERSION }),
-        );
+        if (existing) return existing.id; // one submission per verified student
+        const earlier = Object.values(responses).filter((r) => r.surveyId === surveyId);
+        const decision = screenAndPay({ survey, answers, startedAt, earlier });
         const id = newId("r");
         const record: ResponseRecord = {
           id,
@@ -194,7 +182,7 @@ export const useDemo = create<State & Actions>()(
           wallet,
           answers,
           startedAt,
-          submittedAt,
+          submittedAt: new Date().toISOString(),
           decisions: [decision],
           reviewDeadline: decision.outcome === "review" ? new Date(Date.now() + DAY).toISOString() : undefined,
         };
@@ -206,16 +194,15 @@ export const useDemo = create<State & Actions>()(
         set((s) => {
           const r = s.responses[responseId];
           if (!r || r.appeal || current(r).outcome !== "dont_pay") return s; // one appeal only
-          return {
-            responses: {
-              ...s.responses,
-              [responseId]: { ...r, appeal: { message, submittedAt: new Date().toISOString(), status: "pending" } },
-            },
-          };
+          return { responses: { ...s.responses, [responseId]: { ...r, appeal: { message, submittedAt: new Date().toISOString(), status: "pending" } } } };
         }),
 
       connectDemoWallet: () => set({ demoWallet: { address: fakeAddress(), simulated: true } }),
       disconnectDemoWallet: () => set({ demoWallet: null }),
+
+      setGuideHidden: (guideHidden) => set({ guideHidden }),
+      markLogVisited: () => (get().logVisited ? undefined : set({ logVisited: true })),
+      dismissTip: (id) => set((s) => ({ seenTips: { ...s.seenTips, [id]: true } })),
 
       runTimeouts: () =>
         set((s) => {
@@ -224,10 +211,7 @@ export const useDemo = create<State & Actions>()(
           const responses = { ...s.responses };
           for (const r of Object.values(responses)) {
             if (current(r).outcome === "review" && r.reviewDeadline && new Date(r.reviewDeadline).getTime() <= now) {
-              responses[r.id] = withDecision(
-                r,
-                payout({ ...current(r), outcome: "pay", decidedBy: "timeout", decidedAt: r.reviewDeadline, payoutTx: undefined }),
-              );
+              responses[r.id] = withDecision(r, pay({ ...current(r), outcome: "pay", decidedBy: "timeout", decidedAt: r.reviewDeadline, payoutTx: undefined }));
               changed = true;
             }
           }
@@ -235,11 +219,15 @@ export const useDemo = create<State & Actions>()(
         }),
     }),
     {
-      name: "resfunder-demo-v1",
-      version: 1,
+      name: "resfunder-demo-v3",
+      version: 3,
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,
-      partialize: ({ surveys, responses, session, demoWallet }) => ({ surveys, responses, session, demoWallet }),
+      partialize: ({ ready: _ready, ...rest }) => {
+        void _ready;
+        const { mode, surveys, responses, session, demoWallet, guideHidden, logVisited, seenTips } = rest;
+        return { mode, surveys, responses, session, demoWallet, guideHidden, logVisited, seenTips };
+      },
     },
   ),
 );
@@ -255,18 +243,25 @@ export function responsesFor(all: Record<string, ResponseRecord>, surveyId: stri
 export function surveyStats(survey: Survey, responses: ResponseRecord[]) {
   const counts = { pay: 0, review: 0, dont_pay: 0 } as Record<Outcome, number>;
   for (const r of responses) counts[current(r).outcome]++;
-  const spentCentavos = counts.pay * survey.rateCentavos;
-  const budgetCentavos = survey.rateCentavos * survey.quota;
-  const pendingAppeals = responses.filter((r) => r.appeal?.status === "pending").length;
+  const rate = BigInt(survey.rateUnits);
+  const budget = rate * BigInt(survey.quota);
+  const spent = rate * BigInt(counts.pay);
   return {
     total: responses.length,
     counts,
     paid: counts.pay,
-    spentCentavos,
-    budgetCentavos,
-    remainingCentavos: Math.max(0, budgetCentavos - spentCentavos),
-    pendingAppeals,
+    spent,
+    budget,
+    remaining: budget > spent ? budget - spent : BigInt(0),
+    pendingAppeals: responses.filter((r) => r.appeal?.status === "pending").length,
   };
+}
+
+/** The signed-in student's response to a survey, if any. */
+export function myResponse(all: Record<string, ResponseRecord>, surveyId: string, email: string | undefined) {
+  if (!email) return undefined;
+  const hash = respondentHash(surveyId, email);
+  return Object.values(all).find((r) => r.surveyId === surveyId && r.respondentHash === hash);
 }
 
 export { current };

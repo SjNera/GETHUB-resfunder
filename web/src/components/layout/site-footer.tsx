@@ -1,6 +1,6 @@
 "use client";
 
-import { Moon, RotateCcw, Sun } from "lucide-react";
+import { Database, Moon, RotateCcw, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ export function SiteFooter() {
   const { resolvedTheme, setTheme } = useTheme();
   const reset = useDemo((s) => s.reset);
   return (
-    <footer className="mt-24 border-t border-border">
+    <footer className="mt-24 border-t border-border pb-24 md:pb-0">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-10 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-sm">
           <Logo />
@@ -25,10 +25,10 @@ export function SiteFooter() {
         </div>
         <div className="flex flex-col gap-2 text-sm">
           <Link href="/rubric" className="text-muted hover:text-fg">Screening rubric</Link>
-          <Link href="/dashboard" className="text-muted hover:text-fg">Researcher dashboard</Link>
-          <Link href="/s/sleep-study" className="text-muted hover:text-fg">Try the demo survey</Link>
+          <Link href="/publish" className="text-muted hover:text-fg">Publish a survey</Link>
+          <Link href="/answer" className="text-muted hover:text-fg">Answer a survey</Link>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -41,17 +41,30 @@ export function SiteFooter() {
             <span className="dark:hidden">Dark</span>
             <span className="hidden dark:inline">Light</span>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              reset();
-              toast.success("Demo data reset");
-            }}
-          >
-            <RotateCcw />
-            Reset demo
-          </Button>
+          <div role="group" aria-label="Demo data" className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                reset("fresh");
+                toast.success("Fresh core loop", { description: "The survey is unfunded with no responses." });
+              }}
+            >
+              <RotateCcw />
+              Fresh core loop
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                reset("sample");
+                toast.success("Sample data loaded", { description: "Funded survey with 60 screened responses." });
+              }}
+            >
+              <Database />
+              Sample responses
+            </Button>
+          </div>
         </div>
       </div>
     </footer>

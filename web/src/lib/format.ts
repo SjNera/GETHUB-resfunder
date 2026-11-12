@@ -1,12 +1,17 @@
-const peso = new Intl.NumberFormat("en-PH", {
-  style: "currency",
-  currency: "PHP",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
+import { formatEther } from "viem";
 
-export function formatPeso(centavos: number): string {
-  return peso.format(centavos / 100);
+/** Token units (18 decimals, 1 tPHP = ₱1) → "1,575" or "0.5". Up to `max` decimals. */
+export function pesoAmount(units: bigint | string, max = 2): string {
+  const u = typeof units === "bigint" ? units : BigInt(units);
+  const [int, frac = ""] = formatEther(u).split(".");
+  const cut = frac.slice(0, max).replace(/0+$/, "");
+  const whole = Number(int).toLocaleString("en-PH");
+  return cut ? `${whole}.${cut}` : whole;
+}
+
+/** "₱1,575" */
+export function formatPeso(units: bigint | string, max = 2): string {
+  return `₱${pesoAmount(units, max)}`;
 }
 
 const pluralRules = new Intl.PluralRules("en");

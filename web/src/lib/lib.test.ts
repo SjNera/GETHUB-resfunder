@@ -1,29 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { buildSeed, current } from "./demo/seed";
+import { buildFresh, buildSample, current } from "./demo/seed";
+import { isAllowlisted } from "./allowlist";
 import { mockLabelTwice } from "./demo/mock-llm";
-import { breakdown, centavosToUnits, refundCentavos, unitsToCentavos } from "./fees";
-import { plural } from "./format";
+import { parseEther } from "viem";
+import { breakdown, parsePeso, refundUnits } from "./fees";
+import { formatPeso, plural } from "./format";
 import { SIGNAL_TEXT } from "./reasons";
 import { isGibberish, isStraightLine } from "./rules/checks";
 import { outcomeFor, screen } from "./rules/decide";
 import { canonicalJson, surveyHash } from "./schema";
 import type { Question, SignalCode } from "./types";
 
-describe("fees", () => {
+const php = (x: string) => parseEther(x);
+
+describe("fees (mock peso token, 18 decimals)", () => {
   it("matches the proposal persona: ₱10 × 150 = ₱1,500 + ₱75 = ₱1,575", () => {
-    expect(breakdown(1000, 150)).toEqual({ budgetCentavos: 150_000, feeCentavos: 7_500, depositCentavos: 157_500 });
+    const b = breakdown(php("10"), 150);
+    expect(b.budget).toBe(php("1500"));
+    expect(b.fee).toBe(php("75"));
+    expect(b.deposit).toBe(php("1575"));
   });
   it("rounds the fee down on odd amounts", () => {
-    expect(breakdown(1, 3)).toEqual({ budgetCentavos: 3, feeCentavos: 0, depositCentavos: 3 });
-    expect(breakdown(1250, 7).feeCentavos).toBe(437); // 8750 * 0.05 = 437.5
-  });
-  it("converts to 18-decimal token units and back", () => {
-    expect(centavosToUnits(1000)).toBe(BigInt(10) * BigInt(10) ** BigInt(18));
-    expect(unitsToCentavos(centavosToUnits(157_500))).toBe(157_500);
+    expect(breakdown(BigInt(7), 3).fee).toBe(BigInt(1));
+    expect(breakdown(BigInt(1), 3).fee).toBe(BigInt(0));
   });
   it("refunds only the unused budget", () => {
-    expect(refundCentavos(1000, 150, 60)).toBe(90_000);
-    expect(refundCentavos(1000, 150, 200)).toBe(0);
+    expect(refundUnits(php("10"), 150, 60)).toBe(php("900"));
+    expect(refundUnits(php("10"), 150, 200)).toBe(BigInt(0));
+  });
+  it("parses and formats peso amounts", () => {
+    expect(parsePeso("10")).toBe(php("10"));
+    expect(parsePeso("abc")).toBeNull();
+    expect(formatPeso(php("1575"))).toBe("₱1,575");
+    expect(formatPeso(php("0.5"))).toBe("₱0.5");
   });
 });
 
@@ -122,7 +131,7 @@ describe("rule engine", () => {
 
 describe("seed", () => {
   it("contains every outcome and decision path for the demo", () => {
-    const { responses } = buildSeed(Date.parse("2026-11-12T08:00:00Z"));
+    const { responses } = buildSample(Date.parse("2026-11-12T08:00:00Z"));
     const sleep = Object.values(responses).filter((r) => r.surveyId === "sleep-study");
     expect(sleep).toHaveLength(60);
     const outcomes = sleep.map((r) => current(r).outcome);
@@ -132,6 +141,20 @@ describe("seed", () => {
     const by = sleep.map((r) => current(r).decidedBy);
     expect(by).toEqual(expect.arrayContaining(["rule_engine", "researcher", "timeout"]));
     expect(sleep.some((r) => r.appeal?.status === "pending")).toBe(true);
+  });
+});
+
+describe("core loop setup", () => {
+  it("starts fresh with the hardcoded survey unfunded and no responses", () => {
+    const { surveys, responses } = buildFresh();
+    expect(Object.keys(surveys)).toEqual(["sleep-study"]);
+    expect(surveys["sleep-study"].status).toBe("draft");
+    expect(surveys["sleep-study"].funding).toBeUndefined();
+    expect(Object.keys(responses)).toHaveLength(0);
+  });
+  it("only lets allowlisted emails in, case-insensitively", () => {
+    expect(isAllowlisted("Ana.Santos@umak.edu.ph")).toBe(true);
+    expect(isAllowlisted("someone@gmail.com")).toBe(false);
   });
 });
 

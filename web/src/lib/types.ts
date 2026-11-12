@@ -46,23 +46,26 @@ export type Survey = {
   institution: string;
   questions: Question[];
   status: SurveyStatus;
-  /** Pay per valid response, in centavos (₱10 = 1000). */
-  rateCentavos: number;
+  /** Pay per valid response in mock tPHP units (18 decimals, 1 tPHP = ₱1), as a decimal string. */
+  rateUnits: string;
   quota: number;
   /** ISO string */
   deadline: string;
   estimatedMinutes: number;
   createdAt: string;
+  /** Email of whoever funded it (no roles: any signed-in user can publish). */
+  owner?: string;
   funding?: {
     surveyHash: `0x${string}`;
-    approveTx: `0x${string}`;
+    /** rate × quota + 5% fee, in wei. */
+    depositUnits: string;
     createTx: `0x${string}`;
     fundedAt: string;
     researcherWallet: `0x${string}`;
     simulated: boolean;
   };
   closing?: {
-    refundCentavos: number;
+    refundUnits: string;
     refundTx: `0x${string}`;
     closedAt: string;
     simulated: boolean;

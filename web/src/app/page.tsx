@@ -2,14 +2,15 @@ import { ArrowRight, Check, Clock3, X } from "lucide-react";
 import Link from "next/link";
 import { ActivityStack } from "@/components/landing/activity-stack";
 import { Orbit } from "@/components/landing/orbit";
-import { ButtonLink } from "@/components/ui/button";
+import { OrbScene } from "@/components/three/scenes";
+import { StartButtons } from "@/components/landing/start-buttons";
 
-const facts = ["BNB Smart Chain testnet", "One verified escrow contract", "Answers labelled twice by an LLM", "Flat 5% fee", "One payout per verified student"];
+const facts = ["BNB Smart Chain testnet", "Paid in a mock peso token (tPHP)", "Answers labelled twice by an LLM", "Flat 5% fee", "One submission per verified student"];
 
 const steps = [
   { n: "01", who: "Researcher", title: "Build survey", body: "Google Forms-style builder, five question types." },
-  { n: "02", who: "Researcher", title: "Fund and lock", body: "Rate × quota + 5% fee, locked in escrow." },
-  { n: "03", who: "Respondent", title: "Verify", body: "School email. One payout per student." },
+  { n: "02", who: "Researcher", title: "Fund and lock", body: "Rate × quota + 5% fee, locked in tPHP." },
+  { n: "03", who: "Respondent", title: "Verify", body: "Allowlisted school email. One submission each." },
   { n: "04", who: "Respondent", title: "Answer", body: "Consent, answers, wallet address." },
   { n: "05", who: "Code", title: "Code checks", body: "Speed, straight-lining, duplicate text." },
   { n: "06", who: "AI", title: "AI label", body: "Labelled twice; flags injection. Can only escalate." },
@@ -37,17 +38,11 @@ export default function Home() {
             Pay honest answers.
           </h1>
           <p className="rise-in mt-6 max-w-[34rem] text-lg text-muted [animation-delay:120ms]">
-            Student researchers lock a small survey budget in a smart contract. Respondents are paid in seconds, but only
+            Student researchers lock a small survey budget in a smart contract. Students are paid in seconds by an agent wallet, but only
             for answers that pass a transparent screening check.
           </p>
-          <div className="rise-in mt-8 flex flex-wrap items-center justify-center gap-3 [animation-delay:180ms]">
-            <ButtonLink href="/dashboard" variant="primary" size="lg">
-              Fund a survey
-            </ButtonLink>
-            <ButtonLink href="/s/sleep-study" variant="outline" size="lg">
-              Answer the demo survey
-            </ButtonLink>
-          </div>
+          <StartButtons className="rise-in mt-8 [animation-delay:180ms]" />
+          <p className="rise-in mt-4 text-sm text-muted [animation-delay:200ms]">One sign-in covers both. First time? A short intro shows you how it works.</p>
         </div>
         <div className="rise-in mx-auto mt-14 max-w-md [animation-delay:260ms]">
           <ActivityStack />
@@ -66,11 +61,7 @@ export default function Home() {
       {/* HOW IT WORKS — Liquid Brokers dark stage */}
       <section id="how" className="scroll-mt-28 px-3 pt-16 sm:px-4 sm:pt-24">
         <div className="relative isolate mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] bg-stage px-5 py-16 text-stage-fg sm:px-10 sm:py-20">
-          {/* the orb */}
-          <div aria-hidden className="pointer-events-none absolute left-1/2 top-[58%] -z-10 size-[38rem] -translate-x-1/2 -translate-y-1/2">
-            <div className="motion-safe-only absolute inset-0 animate-[orb-drift_48s_linear_infinite] rounded-full opacity-90 blur-2xl [background:radial-gradient(circle_at_30%_30%,#ffd29c_0%,#ff8a1c_22%,rgba(255,138,28,0.35)_42%,transparent_62%),radial-gradient(circle_at_72%_68%,rgba(120,140,255,0.35)_0%,transparent_40%)]" />
-            <div className="absolute inset-[18%] rounded-full [background:radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.35),rgba(255,255,255,0)_40%)]" />
-          </div>
+          <OrbScene className="pointer-events-none absolute left-1/2 top-[58%] -z-10 aspect-square w-[min(44rem,140%)] -translate-x-1/2 -translate-y-1/2" />
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-sm font-medium uppercase tracking-[0.08em] text-[#ffb36b]">How it works</p>
             <h2 className="display mt-3 text-[clamp(2rem,5vw,3.5rem)]">The AI labels. Only the rule engine decides who gets paid.</h2>
@@ -110,13 +101,13 @@ export default function Home() {
         <div className="max-w-2xl">
           <h2 className="display text-[clamp(2rem,5vw,3.5rem)]">Built for thesis budgets, not research labs.</h2>
           <p className="mt-4 text-lg text-muted">
-            One flat fee, known before signing. Incumbent panels charge 20–40% and price out a ₱1,500 thesis survey.
+            One flat fee, known before signing. Incumbent panels charge 20–40% and price out a thesis-sized budget.
           </p>
         </div>
         <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-0">
           {[
             { big: "₱1,575", label: "Researchers", body: "150 answers at ₱10, plus the 5% fee. Unused budget comes back automatically at close." },
-            { big: "₱10", label: "Respondents", body: "Paid in seconds for an honest answer, with a BscScan receipt. Taglish and short answers are fine." },
+            { big: "₱10", label: "Students", body: "Paid in seconds for an honest answer, with a BscScan receipt. Taglish and short answers are fine." },
             { big: "100%", label: "Advisers", body: "Every decision is logged with its reason, the rubric version and the model version." },
           ].map((a, i) => (
             <div key={a.label} className={i > 0 ? "sm:border-l sm:border-border-strong sm:pl-8" : "sm:pr-8"}>
@@ -169,17 +160,10 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-5 pt-20 sm:pt-28">
         <div className="flex flex-col items-start justify-between gap-6 rounded-[2.5rem] border border-border bg-surface p-8 sm:flex-row sm:items-center sm:p-12">
           <div>
-            <h2 className="display text-[clamp(1.75rem,4vw,2.75rem)]">See the whole flow in three minutes.</h2>
-            <p className="mt-2 text-muted">Answer as a student, then switch to the researcher&apos;s side and decide a Review case.</p>
+            <h2 className="display text-[clamp(1.75rem,4vw,2.75rem)]">Which one are you today?</h2>
+            <p className="mt-2 text-muted">Researchers publish and fund surveys. Students answer them and get paid. You can do both with one sign-in.</p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <ButtonLink href="/s/sleep-study" variant="dark" size="lg">
-              Answer as a student
-            </ButtonLink>
-            <ButtonLink href="/surveys/sleep-study" variant="outline" size="lg">
-              Open the researcher view
-            </ButtonLink>
-          </div>
+          <StartButtons className="sm:justify-end" />
         </div>
       </section>
     </>

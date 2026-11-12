@@ -1,44 +1,42 @@
 /**
- * Budget math. The UI works in centavos (integers); the contract works in
- * token base units (bigint, 18 decimals for the mock tPHP token).
+ * Budget math in mock-token units (tPHP, 18 decimals, 1 tPHP = ₱1). Amounts live in the store as
+ * decimal strings because JSON can't hold bigint.
  *
- * The 5% fee is computed with integer division on the budget. The contract's
- * rounding must match this — confirm with the contract team before go-live.
+ * deposit = rate × quota + 5% fee. The fee uses integer division on the
+ * budget; the contract must round the same way.
  */
+import { formatEther, parseEther } from "viem";
 
-export const FEE_BPS = 500; // 5.00%
-export const TOKEN_DECIMALS = 18;
-const UNITS_PER_CENTAVO = BigInt(10) ** BigInt(TOKEN_DECIMALS - 2);
+export const FEE_BPS = BigInt(500); // 5.00%
+const BPS = BigInt(10_000);
 
-export type Breakdown = {
-  budgetCentavos: number;
-  feeCentavos: number;
-  depositCentavos: number;
-};
+export type Breakdown = { budget: bigint; fee: bigint; deposit: bigint };
 
-export function breakdown(rateCentavos: number, quota: number): Breakdown {
-  if (!Number.isInteger(rateCentavos) || !Number.isInteger(quota) || rateCentavos < 0 || quota < 0) {
-    throw new Error("rate and quota must be non-negative integers");
+export function breakdown(rateUnits: bigint, quota: number): Breakdown {
+  if (rateUnits < BigInt(0) || !Number.isInteger(quota) || quota < 0) {
+    throw new Error("rate and quota must be non-negative");
   }
-  const budget = BigInt(rateCentavos) * BigInt(quota);
-  const fee = (budget * BigInt(FEE_BPS)) / BigInt(10_000);
-  return {
-    budgetCentavos: Number(budget),
-    feeCentavos: Number(fee),
-    depositCentavos: Number(budget + fee),
-  };
+  const budget = rateUnits * BigInt(quota);
+  const fee = (budget * FEE_BPS) / BPS;
+  return { budget, fee, deposit: budget + fee };
 }
 
-export function centavosToUnits(centavos: number): bigint {
-  return BigInt(centavos) * UNITS_PER_CENTAVO;
+/** Unused budget returned at close: rate × (quota − paid). */
+export function refundUnits(rateUnits: bigint, quota: number, paidCount: number): bigint {
+  const unpaid = Math.max(0, quota - Math.min(paidCount, quota));
+  return rateUnits * BigInt(unpaid);
 }
 
-export function unitsToCentavos(units: bigint): number {
-  return Number(units / UNITS_PER_CENTAVO);
+/** "10" → units. Returns null when the text isn't a valid positive amount. */
+export function parsePeso(text: string): bigint | null {
+  const t = text.trim();
+  if (!/^\d*\.?\d+$/.test(t)) return null;
+  try {
+    return parseEther(t);
+  } catch {
+    return null;
+  }
 }
 
-/** Unused budget returned at close: budget minus what was paid out. */
-export function refundCentavos(rateCentavos: number, quota: number, paidCount: number): number {
-  const paid = Math.min(paidCount, quota);
-  return rateCentavos * (quota - paid);
-}
+export const wei = (s: string | bigint) => (typeof s === "bigint" ? s : BigInt(s));
+export const toPesoString = (w: bigint) => formatEther(w);
