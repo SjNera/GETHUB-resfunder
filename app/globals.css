@@ -334,11 +334,6 @@
   }
 }
 
-/* Sign-up is a focused task: no site footer under it. */
-body:has(.auth-flow) .site-footer {
-  display: none;
-}
-
 /* Focused fields scroll clear of the sticky bottom action on phones. */
 .auth-flow :is(input, select, textarea) {
   scroll-margin-bottom: 10rem;

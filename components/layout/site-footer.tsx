@@ -3,11 +3,18 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Logo } from "./logo";
 
+// Sign-up is a focused task: no site footer under it. Decided by route, not by a CSS :has()
+// check, because Next keeps visited pages in the DOM (hidden) and that would hide it everywhere.
+const NO_FOOTER = ["/sign-in"];
+
 export function SiteFooter() {
   const { resolvedTheme, setTheme } = useTheme();
+  const pathname = usePathname();
+  if (NO_FOOTER.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
   return (
     <footer className="site-footer mt-24 border-t border-border">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-10 sm:flex-row sm:items-start sm:justify-between">
