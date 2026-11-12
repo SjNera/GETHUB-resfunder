@@ -151,3 +151,60 @@ describe('straight_lining', () => {
     ]);
   });
 });
+
+describe('edge cases', () => {
+  it('gibberish thresholds sit exactly at the TDD numbers', () => {
+    expect(isGibberish('hmmmm')).toBe(false); // 5 letters, no vowel: under 6
+    expect(isGibberish('brrrrr')).toBe(true); // 6 letters, no vowel
+    expect(isGibberish('hahahahah')).toBe(false); // 9 letters, 2 distinct: under 10
+    expect(isGibberish('hahahahaha')).toBe(true); // 10 letters, 2 distinct
+    expect(isGibberish('!!!!')).toBe(true); // no letters at all
+  });
+  it('counts accented vowels as vowels', () => {
+    expect(isGibberish('brrrrá')).toBe(false);
+  });
+  it('a blank required answer is only empty, not also gibberish', () => {
+    expect(fails(input({}, { q7: '\n\t ' }))).toEqual([{ check: 'empty', questionId: 'q7' }]);
+  });
+  it('reports each failing question in survey order', () => {
+    expect(fails(input({}, { q7: '', q8: 'sdfghjkl' }))).toEqual([
+      { check: 'empty', questionId: 'q7' },
+      { check: 'gibberish', questionId: 'q8' },
+    ]);
+  });
+  it('duplicate starts at exactly 30 normalized characters', () => {
+    const t30 = 'abcde fghij klmno pqrst uvwxyz'; // 30 chars
+    const t29 = t30.slice(0, 29);
+    expect(t30).toHaveLength(30);
+    const prior = (t: string) => ({ prior: { openTexts: { q7: [t] }, durationsMs: [] } });
+    expect(fails(input(prior(t30), { q7: t30 }))).toEqual([{ check: 'duplicate', questionId: 'q7' }]);
+    expect(fails(input(prior(t29), { q7: t29 }))).toEqual([]);
+  });
+  it('normalizes earlier texts before comparing', () => {
+    const long = 'Mabagal ang internet namin kaya laging nadi-disconnect sa class.';
+    const i = input({ prior: { openTexts: { q7: [`  ${long.toUpperCase()}  `] }, durationsMs: [] } }, { q7: long });
+    expect(fails(i)).toEqual([{ check: 'duplicate', questionId: 'q7' }]);
+  });
+});
+
+describe('straight_lining runs', () => {
+  const scale = (id: string) => ({ id, type: 'scale' as const, text: id, required: false, min: 1, max: 5 });
+  const mc = { id: 'm', type: 'multiple_choice' as const, text: 'm', required: false, options: ['a', 'b'] };
+  const s: SurveyJson = {
+    title: 't',
+    description: '',
+    questions: [scale('a'), scale('b'), mc, scale('c'), scale('d'), scale('e'), scale('f')],
+  };
+  const run = (answers: Answers) =>
+    runChecks({ survey: s, answers, durationMs: 600_000, prior: { openTexts: {}, durationsMs: [] } }).weak;
+
+  it('a non-scale question between scale questions does not break the run', () => {
+    expect(run({ a: 2, b: 2, m: 'a', c: 2, d: 2, e: 2 })).toEqual(['straight_lining']);
+  });
+  it('an unanswered scale question breaks the run', () => {
+    expect(run({ a: 2, b: 2, c: 2, e: 2, f: 2 })).toEqual([]);
+  });
+  it('is reported once however long the run is', () => {
+    expect(run({ a: 1, b: 1, c: 1, d: 1, e: 1, f: 1 })).toEqual(['straight_lining']);
+  });
+});
