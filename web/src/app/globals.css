@@ -1,0 +1,361 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * ResFunder design tokens — Chalk / Onyx / Tangerine (60 · 30 · 10).
+ * Components only use the semantic names below; change a hex here and it
+ * changes everywhere.
+ */
+:root {
+  --bg: #ffffff; /* white page (Chalk kept for surfaces) */
+  --surface: #fafaf8;
+  --surface-2: #f2f1ee;
+  --fg: #121212; /* Onyx Black — the 30% */
+  --muted: #5f5f5c;
+  --subtle: #8a8a86;
+  --border: #e2e0db;
+  --border-strong: #cfccc5;
+  --inverse: #121212;
+  --inverse-fg: #f2f1ee;
+  --brand: #ff8a1c; /* Tangerine Glow — the 10% */
+  --brand-hover: #ff9a3d;
+  --brand-fg: #121212; /* text on orange is always Onyx (≈7.9:1) */
+  --brand-ink: #a85300; /* orange text on light backgrounds (≈4.7:1) */
+  --brand-soft: #ffe7cf;
+
+  /* Screening outcomes — tinted badges only, never large fills */
+  --pay: #1f7a3d;
+  --pay-soft: #dcf1e2;
+  --review: #7a5c00; /* yellow (hue ≈45°), clearly not tangerine */
+  --review-soft: #fbefb8;
+  --dontpay: #b42318;
+  --dontpay-soft: #fbe0dd;
+
+  --stage: #0e0e0e; /* the dark "How it works" stage stays Onyx in both themes */
+  --stage-fg: #f2f1ee;
+  --glass: rgb(250 250 248 / 0.64);
+  --glass-edge: rgb(255 255 255 / 0.75);
+  --ring: var(--brand);
+  --shadow-float: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 8px 30px -12px rgb(18 18 18 / 0.18), 0 2px 6px -2px rgb(18 18 18 / 0.06);
+}
+
+.dark {
+  --bg: #121212;
+  --surface: #1a1a1a;
+  --surface-2: #232323;
+  --fg: #f2f1ee;
+  --muted: #a9a9a4;
+  --subtle: #7d7d78;
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
+  --inverse: #f2f1ee;
+  --inverse-fg: #121212;
+  --brand: #ff8a1c;
+  --brand-hover: #ff9a3d;
+  --brand-fg: #121212;
+  --brand-ink: #ff9a3d;
+  --brand-soft: #3a2410;
+
+  --pay: #6fd08f;
+  --pay-soft: #13301d;
+  --review: #f2cf4a;
+  --review-soft: #332a08;
+  --dontpay: #ff8a80;
+  --dontpay-soft: #3a1512;
+
+  --glass: rgb(26 26 26 / 0.7);
+  --glass-edge: rgb(255 255 255 / 0.08);
+  --shadow-float: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 10px 34px -12px rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-inverse: var(--inverse);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-pay: var(--pay);
+  --color-pay-soft: var(--pay-soft);
+  --color-review: var(--review);
+  --color-review-soft: var(--review-soft);
+  --color-dontpay: var(--dontpay);
+  --color-dontpay-soft: var(--dontpay-soft);
+  --color-ring: var(--ring);
+  --color-stage: var(--stage);
+  --color-stage-fg: var(--stage-fg);
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Motion (emil-design-eng) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --shadow-float: var(--shadow-float);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-optical-sizing: auto;
+    line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--brand-soft);
+    color: var(--fg);
+  }
+  /* ≥16px inputs so iOS doesn't zoom */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+}
+
+@layer components {
+  /* Display type: tight tracking + leading that shrinks with size (apple-design) */
+  .display {
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+  }
+  .heading {
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 550;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Translucent material for floating nav and glass cards */
+  .material {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--border);
+    border-top-color: var(--glass-edge); /* bright top edge: light catching the material */
+    box-shadow: var(--shadow-float);
+  }
+  /* Text on glass: a touch darker and heavier than on solid surfaces (vibrancy) */
+  .material .on-glass {
+    color: var(--fg);
+    font-weight: 500;
+    letter-spacing: 0.005em;
+  }
+
+  /* Soft scroll-edge under floating bottom bars, instead of a hard divider */
+  .scroll-edge-bottom {
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent 0%, var(--bg) 70%);
+  }
+
+  /* Pushed screens enter from the right (Back returns the same way) */
+  .page-in {
+    animation: page-in 240ms var(--ease-out) backwards;
+  }
+  .page-back {
+    animation: page-back 240ms var(--ease-out) backwards;
+  }
+
+  /* Press feedback on pointer-down for anything pressable */
+  .pressable {
+    transition: transform 100ms var(--ease-out);
+  }
+  .pressable:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Enter animation for popups (Base UI starting/ending style hooks) */
+  .pop {
+    transform-origin: var(--transform-origin, center);
+    transition:
+      transform 160ms var(--ease-out),
+      opacity 160ms var(--ease-out);
+  }
+  .pop[data-starting-style],
+  .pop[data-ending-style] {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  .pop[data-ending-style] {
+    transition-duration: 110ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .material {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .material {
+    background: var(--surface);
+    border-color: var(--fg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable:active:not(:disabled) {
+    transform: none;
+  }
+  .pop[data-starting-style],
+  .pop[data-ending-style] {
+    transform: none;
+  }
+  .motion-safe-only {
+    animation: none !important;
+  }
+}
+
+/* Slow drift for the landing orb — contained, never full-viewport */
+@keyframes orb-drift {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.04);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes page-back {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in,
+  .page-back {
+    animation: fade-in 200ms ease backwards;
+  }
+}
+
+/* Glass/3D surfaces arrive as material: blur + scale together, not a plain fade */
+.materialize {
+  animation: materialize 420ms var(--ease-out) backwards;
+}
+@keyframes materialize {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .materialize {
+    animation: fade-in 200ms ease backwards;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 420ms var(--ease-out) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
+}
+
+/* Sign-up is a focused task: no site footer under it. */
+body:has(.auth-flow) .site-footer {
+  display: none;
+}
+
+/* Focused fields scroll clear of the sticky bottom action on phones. */
+.auth-flow :is(input, select, textarea) {
+  scroll-margin-bottom: 10rem;
+}
+
+/* Short blur crossfade for in-place label swaps (Copy → Copied). */
+@keyframes swap {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* Toasts rise from the bottom edge and leave the same way. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(150%);
+  }
+}

@@ -5,6 +5,6 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
   test: {
     include: ['**/*.test.ts'],
-    exclude: ['node_modules/**', 'contracts/**', '.next/**'],
+    exclude: ['node_modules/**', 'contracts/**', 'web/**', 'site/**', '.next/**'],
   },
 });
