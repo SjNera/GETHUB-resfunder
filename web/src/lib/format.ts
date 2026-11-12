@@ -1,17 +1,17 @@
 import { formatEther } from "viem";
 
-/** Token units (18 decimals, 1 tPHP = ₱1) → "1,575" or "0.5". Up to `max` decimals. */
-export function pesoAmount(units: bigint | string, max = 2): string {
-  const u = typeof units === "bigint" ? units : BigInt(units);
+/** wei → "0.18" or "1,250.5", up to `max` decimals. */
+export function bnbAmount(wei: bigint | string, max = 4): string {
+  const u = typeof wei === "bigint" ? wei : BigInt(wei);
   const [int, frac = ""] = formatEther(u).split(".");
   const cut = frac.slice(0, max).replace(/0+$/, "");
   const whole = Number(int).toLocaleString("en-PH");
   return cut ? `${whole}.${cut}` : whole;
 }
 
-/** "₱1,575" */
-export function formatPeso(units: bigint | string, max = 2): string {
-  return `₱${pesoAmount(units, max)}`;
+/** "0.18 tBNB" */
+export function formatBnb(wei: bigint | string, max = 4): string {
+  return `${bnbAmount(wei, max)} tBNB`;
 }
 
 const pluralRules = new Intl.PluralRules("en");

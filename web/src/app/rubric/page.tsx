@@ -5,17 +5,18 @@ import { RUBRIC_VERSION } from "@/lib/rules/decide";
 export const metadata: Metadata = { title: "Screening rubric" };
 
 const signals = [
-  ["Open-ended non-answer", "AI label; code confirms empty and keyboard-mash answers", "AI alone: Review. Confirmed by code: hard failure"],
+  ["Empty answer or keyboard-mash gibberish", "Code (skipped where short answers are allowed)", "Hard failure"],
+  ["Not a real attempt: off-question, evasive or copied", "AI label", "Review"],
   ["Instruction-like text (prompt injection)", "AI flag", "Review"],
   ["Duplicate text across responses", "Code", "Hard failure"],
   ["Same option across a block of five or more scale items", "Code", "Weak signal"],
-  ["Finishing far faster than the questions can be read", "Code", "Weak signal"],
+  ["Under half the survey's median time (after 10 responses; before that, under 2 s per question)", "Code", "Weak signal"],
 ];
 
 const decisions = [
   { tone: "bg-pay-soft text-pay", icon: Check, label: "Pay", when: "No hard failure, at most one weak signal, and the AI label is valid (or the question allows short answers).", then: "Paid instantly at the fixed rate." },
-  { tone: "bg-review-soft text-review", icon: Clock3, label: "Review", when: "Two weak signals; an AI label of unclear or non-answer without a code-confirmed failure; the two runs disagree; or an injection flag.", then: "The researcher decides within 24 hours. If not, the respondent is paid." },
-  { tone: "bg-dontpay-soft text-dontpay", icon: X, label: "Don't pay", when: "A code-confirmed hard failure: an empty answer, a duplicate of another response, or keyboard-mash gibberish.", then: "Not paid. The respondent sees the reason and can appeal once." },
+  { tone: "bg-review-soft text-review", icon: Clock3, label: "Review", when: "Two or more weak signals; an AI label of unclear or non-answer; the two runs disagree or a call fails; or an injection flag.", then: "Nothing goes on-chain. The researcher sees it in the Review queue with the AI reason." },
+  { tone: "bg-dontpay-soft text-dontpay", icon: X, label: "Don't pay", when: "A code-confirmed hard failure: an empty answer, a duplicate of another response, or keyboard-mash gibberish.", then: "Not paid. The block and a hash of the reason are recorded on-chain." },
 ];
 
 export default function RubricPage() {
@@ -24,7 +25,7 @@ export default function RubricPage() {
       <p className="eyebrow">Public rubric · {RUBRIC_VERSION}</p>
       <h1 className="display mt-3 text-[clamp(2.25rem,6vw,4rem)]">How responses are screened</h1>
       <p className="mt-5 max-w-[65ch] text-lg text-muted">
-        For each open-ended answer, the AI answers one question: is this a non-answer? It does not rate quality, style or
+        For each open-ended answer, the AI answers one question: is this a real attempt to answer this question? It does not rate quality, style or
         grammar. Brevity, informal writing and code-switching such as Taglish are not problems. Questions a researcher marks
         as allowing short or “none” answers skip this check.
       </p>
@@ -39,8 +40,8 @@ export default function RubricPage() {
         <pre className="mt-5 overflow-x-auto rounded-3xl bg-stage p-5 font-mono text-[13px] leading-relaxed text-stage-fg">
 {`{
   "label": "valid | unclear | non_answer",
-  "non_answer_type": "empty | gibberish | copied | off_question | null",
-  "injection_suspected": false,
+  "type": "off_question | evasive | copied | other | null",
+  "injection": false,
   "reason": "one short sentence"
 }`}
         </pre>

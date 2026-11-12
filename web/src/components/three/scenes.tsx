@@ -3,14 +3,11 @@
 import dynamic from "next/dynamic";
 import { type ReactNode, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import type { CoinKind } from "./coin";
-import { CssCoin, CssHero, CssOrb } from "./fallbacks";
+import { CssOrb } from "./fallbacks";
 import { useRenderPolicy } from "./use-render-policy";
 
-// three.js only loads on routes that render one of these, never in other bundles.
-const HeroCanvas = dynamic(() => import("./hero-canvas"), { ssr: false });
+// three.js loads in its own chunk, only when the orb is rendered.
 const OrbCanvas = dynamic(() => import("./orb-canvas"), { ssr: false });
-const CoinCanvas = dynamic(() => import("./coin-canvas"), { ssr: false });
 
 /** CSS fallback shows first (and stays without WebGL); the canvas fades in once ready. */
 function Stage({ className, fallback, children }: { className?: string; fallback: ReactNode; children: (p: ReturnType<typeof useRenderPolicy> & { onReady: () => void }) => ReactNode }) {
@@ -31,26 +28,10 @@ function Stage({ className, fallback, children }: { className?: string; fallback
   );
 }
 
-export function HeroScene({ className }: { className?: string }) {
-  return (
-    <Stage className={className} fallback={<CssHero />}>
-      {(p) => <HeroCanvas {...p} />}
-    </Stage>
-  );
-}
-
 export function OrbScene({ className }: { className?: string }) {
   return (
     <Stage className={className} fallback={<CssOrb />}>
       {(p) => <OrbCanvas {...p} />}
-    </Stage>
-  );
-}
-
-export function CoinScene({ kind, className }: { kind: CoinKind; className?: string }) {
-  return (
-    <Stage className={className} fallback={<CssCoin kind={kind} />}>
-      {(p) => <CoinCanvas {...p} kind={kind} />}
     </Stage>
   );
 }

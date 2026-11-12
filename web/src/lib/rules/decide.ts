@@ -1,101 +1,110 @@
 /**
- * The rule engine: combines code checks and the two LLM runs into
- * Pay / Review / Don't pay, exactly as the proposal's decision table says.
- * Only this module decides; the LLM label is one input and can only escalate.
+ * The screening pipeline (code checks → AI label → rule engine), exactly as
+ * the build notes define it. Pure functions: the Groq calls happen elsewhere
+ * and arrive here as `LlmRuns` per open-ended question.
+ *
+ * Rules that never change:
+ * - The AI alone can only push a response to Review.
+ * - Don't pay needs a code-confirmed failure.
+ * - If the AI fails, the response goes to Review, not to payment.
  */
-import type { Answers, Decision, LlmLabel, Outcome, Question, Signal } from "../types";
-import { isDuplicate, isEmptyAnswer, isGibberish, isNullToken, isStraightLine, isTooFast } from "./checks";
+import type { AiResult, Answers, CodeSignals, Decision, LlmLabel, LlmRuns, Outcome, Question } from "../types";
+import { isDuplicate, isEmptyAnswer, isGibberish, isStraightLine, isTooFast } from "./checks";
+import { aiReasonText, CODE_TEXT } from "../reasons";
 
-export const RUBRIC_VERSION = "rubric-v1";
+export const RUBRIC_VERSION = "rubric-v2";
 
-export type ScreenInput = {
+type OpenQ = Extract<Question, { type: "short_answer" | "paragraph" }>;
+
+export const openQuestions = (questions: Question[]) =>
+  questions.filter((q): q is OpenQ => q.type === "short_answer" || q.type === "paragraph");
+
+const textOf = (answers: Answers, id: string) => (typeof answers[id] === "string" ? (answers[id] as string) : "");
+
+/** Part A: code checks. No network. */
+export function codeChecks(input: {
   questions: Question[];
   answers: Answers;
+  /** Open-ended answers from other responses in this survey, keyed by question id. */
+  otherAnswers: Record<string, string[]>;
   startedAt: string;
   submittedAt: string;
-  /** Open-ended answers from earlier responses, keyed by question id. */
-  otherAnswers: Record<string, string[]>;
-  /** Two LLM runs per screened question, or null if the LLM failed/timed out. */
-  labels: Record<string, [LlmLabel, LlmLabel] | null>;
-  modelVersion: string;
-};
-
-/** Open-ended questions that go through the non-answer check. */
-export function screenedQuestions(questions: Question[]) {
-  return questions.filter(
-    (q): q is Extract<Question, { type: "short_answer" | "paragraph" }> =>
-      (q.type === "short_answer" || q.type === "paragraph") && !q.allowShort,
-  );
-}
-
-export function collectSignals(input: ScreenInput): Signal[] {
-  const signals: Signal[] = [];
-  const { questions, answers } = input;
-
-  for (const q of questions) {
-    if (q.type !== "short_answer" && q.type !== "paragraph") continue;
-    const text = typeof answers[q.id] === "string" ? (answers[q.id] as string) : "";
-
-    // Copying is checked on every open answer, exempt or not.
-    if (text && isDuplicate(text, input.otherAnswers[q.id] ?? [])) {
-      signals.push({ code: "duplicate_text", strength: "hard", questionId: q.id });
-    }
-    if (q.allowShort) continue;
+  /** Total seconds of earlier responses in this survey. */
+  priorDurations: number[];
+}): CodeSignals {
+  const signals: CodeSignals = { hardFails: [], weak: [] };
+  for (const q of openQuestions(input.questions)) {
+    const text = textOf(input.answers, q.id);
     if (!q.required && isEmptyAnswer(text)) continue;
-
-    const runs = input.labels[q.id];
-    if (runs === null || runs === undefined) {
-      if (!isEmptyAnswer(text)) signals.push({ code: "llm_unavailable", strength: "escalate", questionId: q.id });
-    }
-    const bothNonAnswer = !!runs && runs.every((r) => r.label === "non_answer");
-
-    // Code-confirmed non-answers are hard failures.
-    if (isEmptyAnswer(text) || (bothNonAnswer && isNullToken(text))) {
-      signals.push({ code: "empty_answer", strength: "hard", questionId: q.id });
+    // 1–2 are skipped where the researcher allows short answers ("none", "wala po").
+    if (!q.allowShort && isEmptyAnswer(text)) {
+      signals.hardFails.push({ code: "empty_answer", questionId: q.id });
       continue;
     }
-    if (isGibberish(text)) {
-      signals.push({ code: "gibberish", strength: "hard", questionId: q.id });
+    if (!q.allowShort && isGibberish(text)) {
+      signals.hardFails.push({ code: "gibberish", questionId: q.id });
       continue;
     }
-
-    if (!runs) continue;
-    if (runs.some((r) => r.injection_suspected)) {
-      signals.push({ code: "injection_flag", strength: "escalate", questionId: q.id });
-    }
-    if (runs[0].label !== runs[1].label) {
-      signals.push({ code: "llm_disagree", strength: "escalate", questionId: q.id });
-    } else if (runs[0].label === "non_answer") {
-      signals.push({ code: "llm_non_answer", strength: "escalate", questionId: q.id });
-    } else if (runs[0].label === "unclear") {
-      signals.push({ code: "llm_unclear", strength: "escalate", questionId: q.id });
+    if (isDuplicate(text, input.otherAnswers[q.id] ?? [])) {
+      signals.hardFails.push({ code: "duplicate_text", questionId: q.id });
     }
   }
-
-  if (isStraightLine(questions, answers)) signals.push({ code: "straight_line", strength: "weak" });
-  if (isTooFast(questions, input.startedAt, input.submittedAt)) signals.push({ code: "too_fast", strength: "weak" });
-
+  if (isTooFast(input.questions.length, input.startedAt, input.submittedAt, input.priorDurations)) signals.weak.push("too_fast");
+  if (isStraightLine(input.questions, input.answers)) signals.weak.push("straight_line");
   return signals;
 }
 
-export function outcomeFor(signals: Signal[]): Outcome {
-  if (signals.some((s) => s.strength === "hard")) return "dont_pay";
-  if (signals.some((s) => s.strength === "escalate")) return "review";
-  if (signals.filter((s) => s.strength === "weak").length >= 2) return "review";
+/** Which open-ended answers go to Groq: every answered one that isn't already a hard fail. */
+export function questionsToLabel(questions: Question[], answers: Answers, signals: CodeSignals): string[] {
+  const failed = new Set(signals.hardFails.map((f) => f.questionId));
+  return openQuestions(questions)
+    .filter((q) => !failed.has(q.id) && !isEmptyAnswer(textOf(answers, q.id)))
+    .map((q) => q.id);
+}
+
+const SEVERITY: Record<LlmLabel["label"], number> = { valid: 0, unclear: 1, non_answer: 2 };
+
+/** Part B, steps 9–10: combine the two runs per answer, then the worst label wins. */
+export function combineRuns(runsByQuestion: Record<string, LlmRuns>): AiResult | null {
+  const perAnswer: AiResult[] = Object.values(runsByQuestion).map(([a, b]) => {
+    if (!a || !b) {
+      const ok = a ?? b;
+      return { label: "unclear", type: ok?.type ?? null, injection: !!ok?.injection, reason: "The AI check failed or timed out.", agreed: false };
+    }
+    if (a.label !== b.label) {
+      return { label: "unclear", type: a.type ?? b.type, injection: a.injection || b.injection, reason: "The two AI runs disagreed.", agreed: false };
+    }
+    return { label: a.label, type: a.type, injection: a.injection || b.injection, reason: a.reason, agreed: true };
+  });
+  if (perAnswer.length === 0) return null;
+  const worst = perAnswer.reduce((w, r) => (SEVERITY[r.label] > SEVERITY[w.label] ? r : w));
+  return {
+    ...worst,
+    injection: perAnswer.some((r) => r.injection),
+    agreed: perAnswer.every((r) => r.agreed),
+  };
+}
+
+/** Part C: the rule engine. */
+export function decideOutcome(signals: CodeSignals, ai: AiResult | null): Outcome {
+  if (signals.hardFails.length > 0) return "dont_pay";
+  if (signals.weak.length >= 2) return "review";
+  if (ai && (ai.injection || ai.label !== "valid" || !ai.agreed)) return "review";
   return "pay";
 }
 
-export function screen(input: ScreenInput, now = new Date().toISOString()): Decision {
-  const signals = collectSignals(input);
-  return {
-    outcome: outcomeFor(signals),
-    signals,
-    labels: Object.entries(input.labels)
-      .filter((entry): entry is [string, [LlmLabel, LlmLabel]] => entry[1] !== null)
-      .map(([questionId, runs]) => ({ questionId, runs })),
-    rubricVersion: RUBRIC_VERSION,
-    modelVersion: input.modelVersion,
-    decidedBy: "rule_engine",
-    decidedAt: now,
-  };
+export function screen(input: Parameters<typeof codeChecks>[0] & { runs: Record<string, LlmRuns>; llmModel: string }): Decision {
+  const signals = codeChecks(input);
+  const toLabel = new Set(questionsToLabel(input.questions, input.answers, signals));
+  const runs = Object.fromEntries(
+    [...toLabel].map((id) => [id, input.runs[id] ?? ([null, null] as LlmRuns)]),
+  );
+  const ai = combineRuns(runs);
+  const result = decideOutcome(signals, ai);
+  const reasons = [
+    ...signals.hardFails.map((f) => CODE_TEXT[f.code]),
+    ...signals.weak.map((w) => CODE_TEXT[w]),
+    ...(ai ? [aiReasonText(ai)] : []),
+  ].join(" ");
+  return { result, reasons, signals, ai, llmModel: input.llmModel, rubricVersion: RUBRIC_VERSION };
 }

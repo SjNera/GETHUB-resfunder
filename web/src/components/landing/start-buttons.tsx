@@ -6,49 +6,49 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { useDemo } from "@/lib/data/store";
+import { ANSWER_URL, PUBLISH_URL } from "@/lib/links";
 
 type Path = "publish" | "answer";
 
 type Page = { icon: ReactNode; title: string; body: string; fact: string };
 
+const TARGET: Record<Path, string | null> = { publish: PUBLISH_URL, answer: ANSWER_URL };
+
 /** Three short pages per path: one idea each, concrete numbers from the proposal. */
-const PAGES: Record<Path, { label: string; done: string; target: string; pages: Page[] }> = {
+const PAGES: Record<Path, { label: string; done: string; pages: Page[] }> = {
   publish: {
     label: "Publish a survey",
     done: "Fund the survey",
-    target: "/publish",
     pages: [
       {
         icon: <Lock />,
         title: "Lock your budget once",
-        body: "Set the pay per answer and how many you need. The total plus a 5% fee goes into an escrow contract on BNB Smart Chain.",
-        fact: "₱10 × 150 answers + ₱75 fee = ₱1,575",
+        body: "Set the pay per answer and how many you need. The budget plus a flat fee per response goes into an escrow contract on BNB Smart Chain, in tBNB.",
+        fact: "Deposit = rate × quota + quota × fee per response",
       },
       {
         icon: <FileCheck2 />,
         title: "Only honest answers get paid",
-        body: "Code checks and two AI labels screen every response. Plain rules decide. Unclear cases come to you, and pay the student if you don't decide in 24 hours.",
+        body: "Code checks and two AI labels screen every response. Plain rules decide. Unclear cases come to your Review queue with the AI's reason.",
         fact: "Empty, copied or keyboard-mash answers are never paid",
       },
       {
         icon: <ScrollText />,
         title: "Close and get the rest back",
         body: "Close any time. Everything unspent returns to your wallet, and your adviser can read every decision in the log.",
-        fact: "The 5% fee is the only part you don't get back",
+        fact: "The fee is the only part you don't get back",
       },
     ],
   },
   answer: {
     label: "Answer a survey",
     done: "See open surveys",
-    target: "/answer",
     pages: [
       {
         icon: <MailCheck />,
-        title: "Sign in with your school email",
-        body: "Only a hash of it is stored on-chain. Each student can answer a survey once.",
-        fact: "Demo: pick an email from the allowlist",
+        title: "Sign up once, with your wallet",
+        body: "Verify your school email, then connect MetaMask and sign a free message. Each wallet and email can answer a survey once.",
+        fact: "One account for publishing and answering",
       },
       {
         icon: <Inbox />,
@@ -59,46 +59,59 @@ const PAGES: Record<Path, { label: string; done: string; target: string; pages: 
       {
         icon: <Receipt />,
         title: "Get paid in seconds",
-        body: "If your answers pass, the agent wallet sends the fixed rate right away, with a public receipt. If a person needs to check, you're paid within 24 hours unless they decline, and you can appeal once.",
-        fact: "₱10 per honest answer, in mock pesos (tPHP)",
+        body: "If your answers pass, the agent wallet sends the fixed rate right away, with a public receipt. If a person needs to check, the researcher reviews it with the AI's reason.",
+        fact: "A fixed rate per honest answer, in testnet BNB (tBNB)",
       },
     ],
   },
 };
 
-const seenKey = (p: Path) => `onboard-${p}`;
+const seenKey = (p: Path) => `resfunder-intro-${p}`;
+
+function hasSeen(p: Path) {
+  try {
+    return localStorage.getItem(seenKey(p)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markSeen(p: Path) {
+  try {
+    localStorage.setItem(seenKey(p), "1");
+  } catch {}
+}
 
 /**
  * The landing page's two actions. A first-time visitor gets a short intro
  * sheet for the path they picked; anyone who has seen it goes straight in.
  */
-export function StartButtons({ className, size = "lg" }: { className?: string; size?: "md" | "lg" }) {
+export function StartButtons({ className, size = "lg", id }: { className?: string; size?: "md" | "lg"; id?: string }) {
   const router = useRouter();
-  const ready = useDemo((s) => s.ready);
-  const session = useDemo((s) => s.session);
-  const seen = useDemo((s) => s.seenTips);
-  const dismissTip = useDemo((s) => s.dismissTip);
   const [open, setOpen] = useState<Path | null>(null);
 
   const go = (path: Path) => {
-    const target = PAGES[path].target;
-    router.push(session ? target : `/sign-in?next=${encodeURIComponent(target)}`);
+    const target = TARGET[path];
+    if (!target) return;
+    if (/^https?:\/\//.test(target)) window.location.assign(target);
+    else router.push(target);
   };
 
+  // Returning visitors skip the intro when there is somewhere to go.
   const start = (path: Path) => {
-    if (ready && seen[seenKey(path)]) go(path);
+    if (TARGET[path] && hasSeen(path)) go(path);
     else setOpen(path);
   };
 
   const finish = (path: Path) => {
-    dismissTip(seenKey(path));
+    markSeen(path);
     setOpen(null);
     go(path);
   };
 
   return (
     <>
-      <div className={cn("flex flex-wrap items-center justify-center gap-3", className)}>
+      <div id={id} className={cn("scroll-mt-32 flex flex-wrap items-center justify-center gap-3", className)}>
         <Button variant="primary" size={size} onClick={() => start("publish")}>
           Publish a survey
         </Button>
@@ -107,13 +120,13 @@ export function StartButtons({ className, size = "lg" }: { className?: string; s
         </Button>
       </div>
       <Dialog.Root open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
-        {open ? <Sheet key={open} path={open} onFinish={() => finish(open)} onSkip={() => finish(open)} /> : null}
+        {open ? <Sheet key={open} path={open} hasTarget={!!TARGET[open]} onFinish={() => finish(open)} onSkip={() => finish(open)} /> : null}
       </Dialog.Root>
     </>
   );
 }
 
-function Sheet({ path, onFinish, onSkip }: { path: Path; onFinish: () => void; onSkip: () => void }) {
+function Sheet({ path, hasTarget, onFinish, onSkip }: { path: Path; hasTarget: boolean; onFinish: () => void; onSkip: () => void }) {
   const flow = PAGES[path];
   const [i, setI] = useState(0);
   const [dir, setDir] = useState<"in" | "back">("in");
@@ -177,7 +190,7 @@ function Sheet({ path, onFinish, onSkip }: { path: Path; onFinish: () => void; o
             )}
             {last ? (
               <Button variant="primary" onClick={onFinish} autoFocus>
-                {flow.done}
+                {hasTarget ? flow.done : "Got it"}
               </Button>
             ) : (
               <Button variant="dark" onClick={() => move(i + 1)}>

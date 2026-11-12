@@ -46,7 +46,7 @@ export type Survey = {
   institution: string;
   questions: Question[];
   status: SurveyStatus;
-  /** Pay per valid response in mock tPHP units (18 decimals, 1 tPHP = ₱1), as a decimal string. */
+  /** Pay per valid response in wei (tBNB, 18 decimals), as a decimal string. */
   rateUnits: string;
   quota: number;
   /** ISO string */
@@ -57,7 +57,7 @@ export type Survey = {
   owner?: string;
   funding?: {
     surveyHash: `0x${string}`;
-    /** rate × quota + 5% fee, in wei. */
+    /** rate × quota + quota × fee per response, in wei. */
     depositUnits: string;
     createTx: `0x${string}`;
     fundedAt: string;
@@ -76,77 +76,51 @@ export type Survey = {
 export type AnswerValue = string | string[] | number | null;
 export type Answers = Record<string, AnswerValue>;
 
-/** Exactly the structure the LLM must return (validated with zod server-side). */
+/** Exactly the structure each Groq reply must match (validated with zod; a mismatch counts as a failed call). */
 export type LlmLabel = {
   label: "valid" | "unclear" | "non_answer";
-  non_answer_type: "empty" | "gibberish" | "copied" | "off_question" | null;
-  injection_suspected: boolean;
+  /** Only when the label is unclear or non_answer; null when valid. */
+  type: "off_question" | "evasive" | "copied" | "other" | null;
+  /** True if the answer holds instructions aimed at the AI instead of an answer. */
+  injection: boolean;
+  /** One short plain sentence. */
   reason: string;
 };
 
-export type SignalCode =
-  | "empty_answer"
-  | "gibberish"
-  | "duplicate_text"
-  | "straight_line"
-  | "too_fast"
-  | "llm_non_answer"
-  | "llm_unclear"
-  | "llm_disagree"
-  | "injection_flag"
-  | "llm_unavailable";
+/** Two runs per open-ended answer; null for a run that failed, timed out or didn't match the structure. */
+export type LlmRuns = [LlmLabel | null, LlmLabel | null];
 
-export type SignalStrength = "hard" | "weak" | "escalate";
+/** The two runs combined across all open-ended answers (worst label wins). */
+export type AiResult = {
+  label: LlmLabel["label"];
+  type: LlmLabel["type"];
+  injection: boolean;
+  reason: string;
+  /** False when the runs disagreed or any call failed. */
+  agreed: boolean;
+};
 
-export type Signal = {
-  code: SignalCode;
-  strength: SignalStrength;
-  questionId?: string;
+export type HardFail = "empty_answer" | "gibberish" | "duplicate_text";
+export type WeakSignal = "too_fast" | "straight_line";
+
+export type CodeSignals = {
+  hardFails: { code: HardFail; questionId: string }[];
+  weak: WeakSignal[];
 };
 
 export type Outcome = "pay" | "review" | "dont_pay";
 
-export type DecidedBy = "rule_engine" | "researcher" | "timeout" | "appeal";
-
 export type Decision = {
-  outcome: Outcome;
-  signals: Signal[];
-  /** One label pair per screened open-ended question. */
-  labels: { questionId: string; runs: [LlmLabel, LlmLabel] }[];
+  result: Outcome;
+  /** Code reasons plus the AI's one-sentence reason, in plain words. */
+  reasons: string;
+  signals: CodeSignals;
+  ai: AiResult | null;
+  llmModel: string;
   rubricVersion: string;
-  modelVersion: string;
-  decidedBy: DecidedBy;
-  decidedAt: string;
-  /** Researcher's note when they decide a Review case or reject. */
-  note?: string;
-  payoutTx?: `0x${string}`;
-  simulated?: boolean;
 };
 
-export type Appeal = {
-  message: string;
-  submittedAt: string;
-  status: "pending" | "upheld" | "overturned";
-  resolvedAt?: string;
-};
+/** Payment status of a decision (Pay and Don't pay go on-chain; Review never does). */
+export type DecisionStatus = "pending" | "sent" | "confirmed" | "failed";
 
-export type ResponseRecord = {
-  id: string;
-  surveyId: string;
-  /** keccak256 of the verified school email — only this goes on-chain. */
-  respondentHash: `0x${string}`;
-  wallet: `0x${string}`;
-  answers: Answers;
-  startedAt: string;
-  submittedAt: string;
-  /** Decision history; the last entry is current. */
-  decisions: Decision[];
-  appeal?: Appeal;
-  /** Review cases pay automatically after this time if unresolved. */
-  reviewDeadline?: string;
-};
-
-export type Session = {
-  email: string;
-  role: "researcher" | "respondent";
-};
+export type ResponseStatus = "received" | "screened" | "paid" | "blocked" | "review";

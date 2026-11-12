@@ -13,10 +13,10 @@ type Event = {
 };
 
 const EVENTS: Event[] = [
-  { id: "e1", outcome: "pay", title: "Response #42 · Paid ₱10", detail: "“Madalas may online class pa ng gabi…”", meta: "Taglish · labelled valid twice · BscScan ↗" },
-  { id: "e2", outcome: "review", title: "Response #43 · Sent to Review", detail: "Instruction-like text flagged", meta: "Researcher decides within 24 h, or it pays" },
-  { id: "e3", outcome: "dont_pay", title: "Response #44 · Not paid", detail: "Required answer was “ok”", meta: "Reason shown · one appeal allowed" },
-  { id: "e4", outcome: "pay", title: "Response #45 · Paid ₱10", detail: "“Group projects that only start after 9pm.”", meta: "Code checks passed · BscScan ↗" },
+  { id: "e1", outcome: "pay", title: "Response #42 · Paid 0.001 tBNB", detail: "“Madalas may online class pa ng gabi…”", meta: "Taglish · labelled valid twice · BscScan ↗" },
+  { id: "e2", outcome: "review", title: "Response #43 · Sent to Review", detail: "Instruction-like text flagged", meta: "Waits for the researcher, with the AI reason" },
+  { id: "e3", outcome: "dont_pay", title: "Response #44 · Not paid", detail: "Required answer was “ok”", meta: "Empty answer (code-confirmed) · logged on-chain" },
+  { id: "e4", outcome: "pay", title: "Response #45 · Paid 0.001 tBNB", detail: "“Group projects that only start after 9pm.”", meta: "Code checks passed · BscScan ↗" },
   { id: "e5", outcome: "dont_pay", title: "Response #46 · Not paid", detail: "Copied another response word for word", meta: "Duplicate text (code-confirmed)" },
 ];
 

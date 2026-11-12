@@ -1,51 +1,15 @@
 "use client";
 
-import { BookOpen, LogOut, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { useDemo } from "@/lib/data/store";
 import { Logo } from "./logo";
 
 const links = [
   { href: "/#how", label: "How it works" },
   { href: "/rubric", label: "Rubric" },
-  { href: "/answer", label: "Answer a survey" },
-  { href: "/publish", label: "Publish a survey" },
 ];
-
-function Account({ compact }: { compact?: boolean }) {
-  const session = useDemo((s) => s.session);
-  const ready = useDemo((s) => s.ready);
-  const signOut = useDemo((s) => s.signOut);
-  const guideHidden = useDemo((s) => s.guideHidden);
-  const setGuideHidden = useDemo((s) => s.setGuideHidden);
-  if (!ready) return <span className="h-9 w-20" />;
-  if (!session)
-    return (
-      <ButtonLink href="/sign-in" variant="dark" size="sm">
-        Sign in
-      </ButtonLink>
-    );
-  return (
-    <div className="flex items-center gap-1">
-      {guideHidden ? (
-        <Button variant="ghost" size="sm" onClick={() => setGuideHidden(false)} className={compact ? "px-2.5" : ""} aria-label="Show guide">
-          <BookOpen />
-          {compact ? null : "Guide"}
-        </Button>
-      ) : null}
-      <Button variant="ghost" size="sm" onClick={signOut} title={`Signed in as ${session.email}. Sign out`} aria-label={`Sign out ${session.email}`} className={compact ? "px-2.5" : ""}>
-        {compact ? (
-          <span className="grid size-7 place-items-center rounded-full bg-inverse text-xs font-semibold uppercase text-inverse-fg">{session.email[0]}</span>
-        ) : (
-          <span className="max-w-44 truncate">{session.email}</span>
-        )}
-        <LogOut aria-hidden />
-      </Button>
-    </div>
-  );
-}
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -62,10 +26,11 @@ export function SiteHeader() {
             ))}
           </nav>
           <div className="ml-auto hidden md:block md:ml-0">
-            <Account />
+            <ButtonLink href="/#start" variant="dark" size="sm">
+              Get started
+            </ButtonLink>
           </div>
           <div className="ml-auto flex items-center gap-1 md:hidden">
-            <Account compact />
             <Button variant="ghost" size="icon" aria-expanded={open} aria-controls="mobile-nav" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen((o) => !o)}>
               {open ? <X /> : <Menu />}
             </Button>

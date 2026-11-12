@@ -4,26 +4,6 @@
  */
 import type { Answers, Question, ScaleQuestion } from "../types";
 
-/** Short answers that are non-answers only when the question doesn't allow them. */
-const NULL_TOKENS = new Set([
-  "ok",
-  "okay",
-  "oks",
-  "none",
-  "n/a",
-  "na",
-  "nothing",
-  "wala",
-  "wla",
-  "idk",
-  "no comment",
-  "no",
-  "yes",
-  "k",
-  "-",
-  ".",
-]);
-
 export function normalizeText(text: string): string {
   return text
     .toLowerCase()
@@ -37,10 +17,6 @@ export function normalizeText(text: string): string {
 /** No letters or digits at all ("", "...", "???"). */
 export function isEmptyAnswer(text: string | null | undefined): boolean {
   return !text || !/[\p{L}\p{N}]/u.test(text);
-}
-
-export function isNullToken(text: string): boolean {
-  return NULL_TOKENS.has(normalizeText(text));
 }
 
 const KEYBOARD_RUNS = ["qwert", "werty", "asdf", "sdfg", "dfgh", "fghj", "ghjk", "hjkl", "zxcv", "xcvb", "cvbn", "vbnm", "qwer", "uiop", "jkl"];
@@ -97,17 +73,22 @@ export function isStraightLine(questions: Question[], answers: Answers): boolean
   });
 }
 
-/** Finishing far faster than the questions can be read. */
-export function minimumSeconds(questions: Question[]): number {
-  const words = questions.reduce((n, q) => {
-    const opts = q.type === "multiple_choice" || q.type === "checkboxes" ? q.options.join(" ") : "";
-    return n + `${q.title} ${q.description ?? ""} ${opts}`.split(/\s+/).filter(Boolean).length;
-  }, 0);
-  // ~5 words/second skim reading, plus 2s per question to answer.
-  return Math.round(words / 5 + questions.length * 2);
+/** Median-based speed check from the build notes. */
+export const MEDIAN_MIN_RESPONSES = 10;
+export const FLOOR_SECONDS_PER_QUESTION = 2;
+
+export function median(values: number[]): number {
+  const v = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(v.length / 2);
+  return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
 }
 
-export function isTooFast(questions: Question[], startedAt: string, submittedAt: string): boolean {
+/**
+ * Too fast: under half the median of earlier responses once there are 10 or
+ * more; before that, under 2 seconds per question on average.
+ */
+export function isTooFast(questionCount: number, startedAt: string, submittedAt: string, priorDurations: number[]): boolean {
   const seconds = (new Date(submittedAt).getTime() - new Date(startedAt).getTime()) / 1000;
-  return seconds < minimumSeconds(questions);
+  if (priorDurations.length >= MEDIAN_MIN_RESPONSES) return seconds < median(priorDurations) / 2;
+  return seconds < questionCount * FLOOR_SECONDS_PER_QUESTION;
 }

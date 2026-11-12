@@ -5,12 +5,12 @@ import { Orbit } from "@/components/landing/orbit";
 import { OrbScene } from "@/components/three/scenes";
 import { StartButtons } from "@/components/landing/start-buttons";
 
-const facts = ["BNB Smart Chain testnet", "Paid in a mock peso token (tPHP)", "Answers labelled twice by an LLM", "Flat 5% fee", "One submission per verified student"];
+const facts = ["BNB Smart Chain testnet", "Paid in testnet BNB (tBNB)", "Answers labelled twice by an LLM", "One flat fee per response", "One submission per wallet and email"];
 
 const steps = [
   { n: "01", who: "Researcher", title: "Build survey", body: "Google Forms-style builder, five question types." },
-  { n: "02", who: "Researcher", title: "Fund and lock", body: "Rate × quota + 5% fee, locked in tPHP." },
-  { n: "03", who: "Respondent", title: "Verify", body: "Allowlisted school email. One submission each." },
+  { n: "02", who: "Researcher", title: "Fund and lock", body: "Rate × quota + a flat fee per response, locked in tBNB." },
+  { n: "03", who: "Respondent", title: "Sign in", body: "School email and a verified MetaMask wallet. One submission each." },
   { n: "04", who: "Respondent", title: "Answer", body: "Consent, answers, wallet address." },
   { n: "05", who: "Code", title: "Code checks", body: "Speed, straight-lining, duplicate text." },
   { n: "06", who: "AI", title: "AI label", body: "Labelled twice; flags injection. Can only escalate." },
@@ -41,8 +41,8 @@ export default function Home() {
             Student researchers lock a small survey budget in a smart contract. Students are paid in seconds by an agent wallet, but only
             for answers that pass a transparent screening check.
           </p>
-          <StartButtons className="rise-in mt-8 [animation-delay:180ms]" />
-          <p className="rise-in mt-4 text-sm text-muted [animation-delay:200ms]">One sign-in covers both. First time? A short intro shows you how it works.</p>
+          <StartButtons id="start" className="rise-in mt-8 [animation-delay:180ms]" />
+          <p className="rise-in mt-4 text-sm text-muted [animation-delay:200ms]">One account and wallet covers both. First time? A short intro shows you how it works.</p>
         </div>
         <div className="rise-in mx-auto mt-14 max-w-md [animation-delay:260ms]">
           <ActivityStack />
@@ -88,8 +88,8 @@ export default function Home() {
               <span className="text-xs font-medium opacity-70">Outcome</span>
               <div className="mt-6 flex flex-col gap-1.5 text-[15px] font-semibold">
                 <span className="flex items-center gap-2"><Check className="size-4" strokeWidth={3} /> Pay, in seconds</span>
-                <span className="flex items-center gap-2"><Clock3 className="size-4" strokeWidth={3} /> Review, max 24 h</span>
-                <span className="flex items-center gap-2"><X className="size-4" strokeWidth={3} /> Don&apos;t pay, appeal once</span>
+                <span className="flex items-center gap-2"><Clock3 className="size-4" strokeWidth={3} /> Review, by the researcher</span>
+                <span className="flex items-center gap-2"><X className="size-4" strokeWidth={3} /> Don&apos;t pay, reason shown</span>
               </div>
             </li>
           </ol>
@@ -101,13 +101,13 @@ export default function Home() {
         <div className="max-w-2xl">
           <h2 className="display text-[clamp(2rem,5vw,3.5rem)]">Built for thesis budgets, not research labs.</h2>
           <p className="mt-4 text-lg text-muted">
-            One flat fee, known before signing. Incumbent panels charge 20–40% and price out a thesis-sized budget.
+            One flat fee per response, shown in tBNB before you sign. Incumbent panels charge 20–40% and price out a thesis-sized budget.
           </p>
         </div>
         <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-0">
           {[
-            { big: "₱1,575", label: "Researchers", body: "150 answers at ₱10, plus the 5% fee. Unused budget comes back automatically at close." },
-            { big: "₱10", label: "Students", body: "Paid in seconds for an honest answer, with a BscScan receipt. Taglish and short answers are fine." },
+            { big: "1 deposit", label: "Researchers", body: "Rate × quota plus a flat fee per response, locked once. Unused budget comes back to your wallet at close." },
+            { big: "Seconds", label: "Students", body: "Paid the fixed rate in tBNB for an honest answer, with a BscScan receipt. Taglish and short answers are fine." },
             { big: "100%", label: "Advisers", body: "Every decision is logged with its reason, the rubric version and the model version." },
           ].map((a, i) => (
             <div key={a.label} className={i > 0 ? "sm:border-l sm:border-border-strong sm:pl-8" : "sm:pr-8"}>
@@ -133,13 +133,13 @@ export default function Home() {
               tone: "bg-review-soft text-review",
               icon: <Clock3 className="size-4" strokeWidth={3} />,
               title: "Review",
-              body: "Two weak signals, an unclear label, disagreeing runs or an injection flag. Unresolved after 24 h? The respondent is paid.",
+              body: "Two weak signals, an unclear or non-answer label, disagreeing runs, a failed AI call or an injection flag. The researcher sees the AI reason.",
             },
             {
               tone: "bg-dontpay-soft text-dontpay",
               icon: <X className="size-4" strokeWidth={3} />,
               title: "Don't pay",
-              body: "Only a code-confirmed failure: an empty answer, a copy of another response, or keyboard mash. Appeal once.",
+              body: "Only a code-confirmed failure: an empty answer, a copy of another response, or keyboard mash. The reason is logged on-chain.",
             },
           ].map((c) => (
             <div key={c.title} className="rounded-3xl border border-border bg-surface p-6">
@@ -161,7 +161,7 @@ export default function Home() {
         <div className="flex flex-col items-start justify-between gap-6 rounded-[2.5rem] border border-border bg-surface p-8 sm:flex-row sm:items-center sm:p-12">
           <div>
             <h2 className="display text-[clamp(1.75rem,4vw,2.75rem)]">Which one are you today?</h2>
-            <p className="mt-2 text-muted">Researchers publish and fund surveys. Students answer them and get paid. You can do both with one sign-in.</p>
+            <p className="mt-2 text-muted">Researchers publish and fund surveys. Students answer them and get paid. One account and wallet does both.</p>
           </div>
           <StartButtons className="sm:justify-end" />
         </div>
