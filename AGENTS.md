@@ -2,6 +2,14 @@
 
 Rules for every coding agent and developer in this repo. Read this file first, then the section of `docs/TDD.md` named in your task. `docs/PRD.md` explains the product and what is out of scope.
 
+Reference docs, in order of authority:
+
+1. `AGENTS.md` (this file)
+2. `docs/TDD.md`: the spec. It wins on any technical conflict.
+3. `docs/PRD.md`: product scope.
+4. Team idea board (Google Doc): https://docs.google.com/document/d/1fSxgq870Qw3h5Sx-HWzaPPLcBOgDNKOiH8jPftbBg_c/edit?usp=sharing
+   Tabs: Original Proposal, Revision Notes (pipeline diagrams), Flags (accepted risks), Build Plan, feature list. Read it for the reasoning behind a decision. It is background, not spec: where it disagrees with the TDD (for example the 5% fee, the owner-only fee update), the TDD is current. If the doc has a newer decision the TDD lacks, stop and ask.
+
 ## 1. Product in one paragraph
 
 ResFunder lets a student researcher lock a survey budget in a smart contract on BNB Smart Chain testnet (native tBNB). Respondents answer the survey. Each response is screened by code checks and an AI label (Groq). A plain rule engine decides Pay, Review, or Don't pay. The contract pays the fixed rate only for passing responses, and the researcher gets the unused budget back when the survey closes.
@@ -107,6 +115,65 @@ Names only. Values are shared privately. See `.env.example`.
 5. If something in the spec is unclear or contradicts another part, stop and ask. Do not guess.
 
 Branches: `lane-a`, `lane-b`, `lane-c`, `ui`. Merge to `main` when a task's check passes.
+
+### 8.1 Commit loop
+
+Every commit, every dev, every agent, runs this loop.
+
+```
+SYNC -> READ -> BUILD -> CHECK -> GUARD -> COMMIT -> PUSH -> (task done?) MERGE -> ANNOUNCE
+```
+
+1. **Sync.** On your lane branch, pull and bring in `main` so you have the latest frozen files and stubs.
+   ```
+   git checkout lane-x && git pull && git merge main
+   ```
+   Use merge, not rebase. Lane branches are shared and pushed.
+2. **Read.** The task row in TDD section 13, the sections it names, and this file. Use the idea board only for the reasoning behind a decision.
+3. **Build.** One small, working step of the task. Only your lane's folders (section 4).
+4. **Check.** Run the lane check before every commit (table below). A commit must not break `npm run check`.
+5. **Guard.** Before staging, look at what changed:
+   ```
+   git status --short
+   git diff --name-only main -- lib/types.ts lib/canonical.ts lib/auth/message.ts lib/db/schema.sql
+   ```
+   - The second command must print nothing. If it lists a file, undo it and follow 8.3.
+   - Every changed path is inside your lane.
+   - No `.env`, keys, RPC URLs with keys, or Groq output containing respondent data.
+6. **Commit.** `<TaskID>: <what changed>`, present tense, one line. A task can take several commits, each prefixed with its ID: `A2: deposit and fee tests`, `A2: reentrancy test`. Use `fix(<TaskID>):` for a fix after merge.
+7. **Push** the lane branch. Push at least every hour so the others can see progress.
+8. **Merge** only when the task's own check from TDD section 13 passes:
+   ```
+   git checkout main && git pull && git merge --no-ff lane-x
+   npm run check            # run again on main, plus `cd contracts && npm test` if contracts changed
+   git push
+   git checkout lane-x && git merge main
+   ```
+   If the check fails on `main`, revert the merge commit (`git revert -m 1 HEAD`) and fix on the lane branch.
+9. **Announce** in the team chat: task ID done, the merge commit, any new env variable, and any stub that now has real code. Joins (TDD section 14) start only after both sides have announced.
+
+### 8.2 Checks per lane
+
+| Lane | Before every commit | Task done (before merge) |
+|---|---|---|
+| A, chain | `cd contracts && npm test` (Solidity), `npm run check` (if `lib/chain/` changed) | The TDD 13 check, for example BscScan verified for A4 |
+| B, screening | `npm run check` | Tests for the task pass; B3 adds one live Groq call, B5 the accuracy table |
+| C, plumbing | `npm run check` | Route shapes match TDD 7; C6 `scripts/e2e.ts --stubs` passes |
+| UI | `npm run check` and `npm run build` | The U-task check with a wallet on BSC testnet |
+
+`npm run check` = `tsc --noEmit` + `vitest run`.
+
+### 8.3 Frozen file changes
+
+1. Stop. Do not edit the file on your branch.
+2. Post the change and the reason in the team chat.
+3. When all three devs agree, Dev 2 makes the change on `main` in its own commit: `FROZEN: <file>: <change>`.
+4. Every lane runs step 1 of the loop (merge `main`) before continuing.
+
+### 8.4 For coding agents
+
+- One task ID per session. Run the loop yourself up to step 7. Do not merge to `main` or announce. The dev does steps 8 and 9.
+- Report at the end: the task ID, the commits made, the check output, and anything that needs a frozen-file change or a decision.
 
 ## 9. Do not build
 

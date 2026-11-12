@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check": "tsc --noEmit && vitest run",
     "db:apply": "node --env-file=.env scripts/apply-schema.mjs"
   },
   "dependencies": {
