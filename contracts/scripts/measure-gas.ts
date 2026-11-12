@@ -41,7 +41,8 @@ const createGas = await gasOf(
 );
 
 // Worst case: first Pay in the survey (paidCount 0 -> 1) to an address that has never held funds.
-const freshAccount = `0x${'00'.repeat(19)}a3` as const;
+// All address bytes are non-zero, the most expensive calldata (real addresses are close to this).
+const freshAccount = `0x${'fe'.repeat(20)}` as const;
 const payFirstFreshGas = await gasOf(
   escrow.write.recordDecision([1n, freshAccount, 1, reason], { account: agent.account }),
 );
