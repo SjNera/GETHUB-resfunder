@@ -34,7 +34,7 @@ const KEYS = {
   researcher: '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6',
 } as const satisfies Record<string, Hex>;
 
-const GAS = 18_355_800_000_000n;
+const GAS = 18_390_000_000_000n;
 const PROFIT = 20_000_000_000_000n;
 const FEE = GAS + PROFIT;
 const RATE = parseEther('0.001');
