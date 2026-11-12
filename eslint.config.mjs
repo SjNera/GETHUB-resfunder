@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Separate packages and static files.
     "contracts/**",
     "site/**",
+    // Vanilla JS ported as-is from the demo artifact.
+    "components/resfunder/engine.js",
   ]),
 ]);
 

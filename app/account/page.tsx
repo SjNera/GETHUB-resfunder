@@ -1,8 +1,0 @@
-import type { Metadata } from "next";
-import { AccountView } from "@/components/auth/account-view";
-
-export const metadata: Metadata = { title: "Your details" };
-
-export default function AccountPage() {
-  return <AccountView />;
-}
