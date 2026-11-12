@@ -18,7 +18,7 @@ const TARGET: Record<Path, string | null> = { publish: PUBLISH_URL, answer: ANSW
 const PAGES: Record<Path, { label: string; done: string; pages: Page[] }> = {
   publish: {
     label: "Publish a survey",
-    done: "Fund the survey",
+    done: "Sign in to publish",
     pages: [
       {
         icon: <Lock />,
@@ -42,7 +42,7 @@ const PAGES: Record<Path, { label: string; done: string; pages: Page[] }> = {
   },
   answer: {
     label: "Answer a survey",
-    done: "See open surveys",
+    done: "Sign in to answer",
     pages: [
       {
         icon: <MailCheck />,

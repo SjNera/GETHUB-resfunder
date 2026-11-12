@@ -9,7 +9,7 @@ import { Logo } from "./logo";
 export function SiteFooter() {
   const { resolvedTheme, setTheme } = useTheme();
   return (
-    <footer className="mt-24 border-t border-border">
+    <footer className="site-footer mt-24 border-t border-border">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-10 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-sm">
           <Logo />
@@ -17,12 +17,13 @@ export function SiteFooter() {
             Fund research. Pay honest answers. Built for BCC 2026 by EJ Bagayan, Victor Condicion and Stephen Nera.
           </p>
           <p className="mt-3 text-xs text-subtle">
-            Answers stay off-chain; only hashes go on-chain. Handled under the Data Privacy Act of 2012.
+            Answers and emails stay off-chain; only wallet addresses and reason hashes go on-chain. Handled under the Data Privacy Act of 2012.
           </p>
         </div>
         <div className="flex flex-col gap-2 text-sm">
           <Link href="/rubric" className="text-muted hover:text-fg">Screening rubric</Link>
           <Link href="/#how" className="text-muted hover:text-fg">How it works</Link>
+          <Link href="/privacy" className="text-muted hover:text-fg">Privacy</Link>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button

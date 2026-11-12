@@ -11,7 +11,7 @@ const steps = [
   { n: "01", who: "Researcher", title: "Build survey", body: "Google Forms-style builder, five question types." },
   { n: "02", who: "Researcher", title: "Fund and lock", body: "Rate × quota + a flat fee per response, locked in tBNB." },
   { n: "03", who: "Respondent", title: "Sign in", body: "School email and a verified MetaMask wallet. One submission each." },
-  { n: "04", who: "Respondent", title: "Answer", body: "Consent, answers, wallet address." },
+  { n: "04", who: "Respondent", title: "Answer", body: "Consent and answers. Paid to your verified wallet." },
   { n: "05", who: "Code", title: "Code checks", body: "Speed, straight-lining, duplicate text." },
   { n: "06", who: "AI", title: "AI label", body: "Labelled twice; flags injection. Can only escalate." },
   { n: "07", who: "Rule engine", title: "Decide", body: "Plain code turns signals into Pay, Review or Don't pay." },
@@ -66,7 +66,7 @@ export default function Home() {
             <p className="text-sm font-medium uppercase tracking-[0.08em] text-[#ffb36b]">How it works</p>
             <h2 className="display mt-3 text-[clamp(2rem,5vw,3.5rem)]">The AI labels. Only the rule engine decides who gets paid.</h2>
             <p className="mx-auto mt-4 max-w-xl text-[17px] text-white/70">
-              The LLM answers one narrow question: is this a non-answer? It can only send a response to a person. Plain,
+              The LLM answers one narrow question: is this a real attempt to answer? It can only send a response to a person. Plain,
               published code makes every payment decision.
             </p>
           </div>
