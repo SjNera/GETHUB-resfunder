@@ -918,10 +918,11 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
 .au-bar{height:4px;border-radius:4px;background:var(--well);overflow:hidden;margin:10px 0 0}
 .au-bar i{display:block;height:100%;background:var(--black);border-radius:4px;transform-origin:left;transition:transform 250ms var(--ease-out)}
 @media (prefers-reduced-motion:reduce){.au-bar i{transition:none}}
-.au-body{padding-top:18px;animation:auIn 240ms var(--ease-out)}
-@keyframes auIn{from{opacity:0;transform:translateX(10px)}}
-@media (prefers-reduced-motion:reduce){.au-body{animation:rdFade 200ms ease}}
-.au-body h1{font:700 clamp(1.7rem,6vw,2.1rem)/1.08 var(--f-head);letter-spacing:-.035em;margin:0;text-wrap:balance}
+.au-body{padding-top:18px}
+.au-anim{animation:auIn 240ms var(--ease-out)}.au-anim-back{animation:auBack 240ms var(--ease-out)}
+@keyframes auIn{from{opacity:0;transform:translateX(12px)}}@keyframes auBack{from{opacity:0;transform:translateX(-12px)}}
+@media (prefers-reduced-motion:reduce){.au-anim,.au-anim-back{animation:rdFade 200ms ease}}
+.au-body h1{font:700 clamp(1.7rem,6vw,2.1rem)/1.08 var(--f-head);letter-spacing:-.035em;margin:0 0 20px;text-wrap:balance}
 .au-lead{color:var(--muted);margin:10px 0 22px;font-size:15.5px}
 .au-demo{padding:8px 0;margin-bottom:6px}
 .au-center{text-align:center;margin:14px 0 0}
@@ -938,6 +939,18 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
 /* back to Surveys on a survey page */
 .crumb-back{display:inline-flex;align-items:center;gap:6px}
 .crumb-back svg{width:14px;height:14px}
+
+/* closed-survey results */
+.cr-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.cr-sum>div{border:1px solid var(--line);background:var(--card);border-radius:16px;padding:14px 16px;min-width:0}
+.cr-sum span{display:block;font-size:13px;color:var(--muted)}.cr-sum b{display:block;font:700 22px/1.2 var(--f-head);letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+.cr-sum small{font:500 14px var(--f-body);color:var(--muted)}
+@media (max-width:760px){.cr-sum{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cr-row{display:flex;justify-content:space-between;gap:12px}.cr-n{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hbar .n small{font-weight:400}
+
+.cr-bars .hbar{grid-template-columns:minmax(0,150px) minmax(0,1fr) auto}
+.cr-bars .hbar .n{white-space:nowrap;min-width:84px;text-align:right}
 </style>
 
 <div class="banner"><b>BSC Testnet</b> · test tokens only, no real money · demo mode: sign-in, MetaMask and transactions are simulated</div>
@@ -1115,109 +1128,101 @@ function stepper(items,cur){
   return `<div class="stepper" role="list">${items.map((it,i)=>{const st=i<cur?'done':i===cur?'now':'';
     return `${i?`<span class="sp-ln ${i<=cur?'done':''}" aria-hidden="true"></span>`:''}<span class="sp-i ${st}" role="listitem" ${st==='now'?'aria-current="step"':''}><span class="c">${i<cur?I.check:i+1}</span><span>${it[0]}${it[1]?`<small>${it[1]}</small>`:''}</span></span>`}).join('')}</div>`;
 }
-/* ================= sign-up / sign-in per "ResFunder: sign-up and sign-in spec" (no 6-digit code) =================
-   One door: school email → (new) Who are you? → setup steps → wallet → You're all set.
+/* ================= sign-in (final) =================
+   Email → Who are you? → About you → Where you are (+ two consent boxes) → What describes you best → Wallet → You're all set.
+   No 6-digit code. Errors only on Continue. "Others" opens a text box. Under 18 stops sign-up.
    A known email goes straight in; an unfinished setup resumes where it stopped. */
-const SCHOOLS={'umak.edu.ph':'University of Makati','up.edu.ph':'University of the Philippines','ateneo.edu':'Ateneo de Manila University','dlsu.edu.ph':'De La Salle University','ust.edu.ph':'University of Santo Tomas','pup.edu.ph':'Polytechnic University of the Philippines'};
-const PERSONAL=['gmail.com','yahoo.com','outlook.com','hotmail.com','icloud.com','proton.me'];
-const ACC_KEY='rf-accounts-v2';
+const ACC_KEY='rf-accounts-v3';
 const accounts=()=>{try{return JSON.parse(localStorage.getItem(ACC_KEY)||'{}')}catch(e){return {}}};
 const saveAcc=a=>{try{const all=accounts();all[a.email]=a;localStorage.setItem(ACC_KEY,JSON.stringify(all))}catch(e){}};
-const pf=()=>S.auth.pf||(S.auth.pf={role:'',age:'',sex:'',sexO:'',college:'',collegeO:'',program:'',year:'',yearO:'',region:'',city:'',working:'',dept:'',deptO:'',frole:'',froleO:'',c1:false,c2:false});
+const pf=()=>S.auth.pf||(S.auth.pf={who:'',whoO:'',age:'',sex:'',sexO:'',region:'',city:'',c1:false,c2:false,g1:'',g1O:'',g2:'',g2O:''});
+const WHO=[['student','Student'],['employed','Employed'],['self','Self-employed'],['unemployed','Unemployed'],['senior','Senior citizen'],['other','Others']];
 const PF={
-  age:[['18-20','18–20'],['21-23','21–23'],['24-26','24–26'],['27+','27 or older'],['under_18','Under 18']],
+  age:[['under_18','Under 18'],['18-24','18–24'],['25-34','25–34'],['35-44','35–44'],['45-59','45–59'],['60+','60 or older']],
   sex:[['female','Female'],['male','Male'],['prefer_not','Prefer not to say'],['other','Others']],
-  college:[['arts','Arts and sciences'],['business','Business'],['computing','Computing / IT'],['education','Education'],['engineering','Engineering'],['health','Health sciences'],['other','Others']],
-  year:[['1','1st'],['2','2nd'],['3','3rd'],['4','4th'],['5+','5th or more'],['grad','Graduate'],['other','Others']],
-  working:[['no','No'],['part','Part-time'],['full','Full-time'],['prefer_not','Prefer not to say']],
-  frole:[['adviser','Thesis adviser'],['instructor','Instructor'],['panel','Panel member'],['other','Others']],
-  region:['NCR · Metro Manila','CAR · Cordillera','Region I · Ilocos','Region II · Cagayan Valley','Region III · Central Luzon','Region IV-A · CALABARZON','MIMAROPA','Region V · Bicol','Region VI · Western Visayas','Region VII · Central Visayas','Region VIII · Eastern Visayas','Region IX · Zamboanga Peninsula','Region X · Northern Mindanao','Region XI · Davao','Region XII · SOCCSKSARGEN','Region XIII · Caraga','BARMM','Prefer not to say']};
-function checkEmail(v){const e=(v||'').trim().toLowerCase();
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))return {err:'Enter your school email, like name@umak.edu.ph.'};
-  const host=e.split('@')[1];if(PERSONAL.includes(host))return {err:'Use your school email, like name@umak.edu.ph.'};
-  const d=Object.keys(SCHOOLS).find(k=>host===k||host.endsWith('.'+k));if(!d)return {err:host+" isn't on ResFunder yet."};
-  return {email:e,school:SCHOOLS[d]}}
-const PREFER='Surveys that need this won\'t be shown to you if you prefer not to say.';
-function pills(key,label,opts,help){const P=pf(),other=opts.some(o=>o[0]==='other');
+  region:['NCR · Metro Manila','CAR · Cordillera','Region I · Ilocos','Region II · Cagayan Valley','Region III · Central Luzon','Region IV-A · CALABARZON','MIMAROPA','Region V · Bicol','Region VI · Western Visayas','Region VII · Central Visayas','Region VIII · Eastern Visayas','Region IX · Zamboanga Peninsula','Region X · Northern Mindanao','Region XI · Davao','Region XII · SOCCSKSARGEN','Region XIII · Caraga','BARMM']};
+const INDUSTRY=[['education','Education'],['health','Health'],['it','IT / BPO'],['retail','Retail and sales'],['government','Government'],['other','Others']];
+/** "What describes you best": the choice groups for each answer to Who are you? */
+const GROUPS={
+  student:[['Level',[['shs','Senior high school'],['college','College'],['grad','Graduate school'],['other','Others']]],['Field',[['arts','Arts and sciences'],['business','Business'],['computing','Computing / IT'],['education','Education'],['engineering','Engineering'],['health','Health sciences'],['other','Others']]]],
+  employed:[['Work type',[['full','Full-time'],['part','Part-time'],['contract','Contract'],['other','Others']]],['Industry',INDUSTRY]],
+  self:[['Kind of work',[['owner','Business owner'],['freelance','Freelancer'],['gig','Gig work'],['other','Others']]],['Industry',INDUSTRY]],
+  unemployed:[['Situation',[['looking','Looking for work'],['notlooking','Not looking for now'],['home','Homemaker'],['recent','Recent graduate'],['other','Others']]]],
+  senior:[['Situation',[['retired','Retired'],['working','Still working'],['volunteer','Volunteering'],['other','Others']]]],
+  other:[['Situation',[['studying','Studying'],['working','Working'],['notworking','Not working'],['other','Others']]]]};
+const TOTAL=4;
+function pills(key,label,opts){const P=pf();
   return `<fieldset class="pf-set"><legend>${label}</legend><div class="pf-pills">${opts.map(([v,l])=>`<label class="pf-pill"><input type="radio" name="pf-${key}" data-pf="${key}" value="${v}" ${P[key]===v?'checked':''}><span>${l}</span></label>`).join('')}</div>
-    ${other&&P[key]==='other'?`<label class="pf-other"><span>Specify</span><input class="inp" data-pft="${key}O" maxlength="60" placeholder="Type here" value="${esc(P[key+'O'])}"></label>`:''}
-    ${help?`<p class="hint" style="margin:6px 0 0">${help}</p>`:''}</fieldset>`}
-const stepCount=()=>pf().role==='faculty'?2:4;
-/** Validation for the current setup step; runs on Continue only. */
-function pfError(i){const P=pf(),o=(k,m)=>!P[k]?m:(P[k]==='other'&&!P[k+'O'].trim()?'Tell us which one, or pick an option above.':'');
-  const fac=P.role==='faculty';
-  const list=fac?[[o('dept','Pick your department.'),o('frole','Pick your role.'),P.c1?'':'Tick the privacy box to finish setup.']]
-    :[[P.age?'':'Pick your age range.',o('sex','Pick one, or Prefer not to say.')],
-      [o('college','Pick your college.'),P.program.trim()?'':'Enter your program or course.',o('year','Pick your year level.')],
-      [P.region?'':'Pick your region, or Prefer not to say.',P.working?'':'Pick one, or Prefer not to say.',P.c1&&P.c2?'':'Tick both boxes to finish setup.']];
-  return (list[i]||[]).find(Boolean)||''}
-function persist(extra){const A=S.auth;saveAcc(Object.assign({email:A.email,school:A.school,role:pf().role,pf:pf(),setup:A.idx,wallet:A.wallet||null,done:false},extra||{}))}
-function authShell(inner,{back,step,total}={}){
+    ${P[key]==='other'?`<label class="pf-other"><span>Specify</span><input class="inp" data-pft="${key}O" maxlength="60" placeholder="Type here" value="${esc(P[key+'O'])}"></label>`:''}</fieldset>`}
+/* errors run on Continue only */
+const oth=(P,k,m)=>!P[k]?m:(P[k]==='other'&&!P[k+'O'].trim()?'Tell us which one, or pick an option above.':'');
+function stepError(stage,i){const P=pf();
+  if(stage==='who')return oth(P,'who','Choose what describes you.');
+  if(i===0)return (P.age?'':'Pick your age range.')||oth(P,'sex','Pick one, or Prefer not to say.');
+  if(i===1)return (P.region?'':'Choose your region.')||(P.city.trim()?'':'Enter your city or municipality.')||(P.c1&&P.c2?'':'Tick both boxes to continue.');
+  if(i===2){const G=GROUPS[P.who]||[];return (G[0]?oth(P,'g1','Pick one for '+G[0][0].toLowerCase()+'.'):'')||(G[1]?oth(P,'g2','Pick one for '+G[1][0].toLowerCase()+'.'):'')}
+  return ''}
+function persist(extra){const A=S.auth;saveAcc(Object.assign({email:A.email,pf:pf(),stage:A.stage,idx:A.idx||0,wallet:A.wallet||null,done:false},extra||{}))}
+/* morph: the card eases to its new height; content slides only when the step changes */
+let auPrevH=0;
+function morphAuth(){const c=document.querySelector('.authc');if(!c)return;const h=c.offsetHeight,from=auPrevH;auPrevH=h;
+  if(!from||Math.abs(h-from)<2||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  c.animate([{height:from+'px',overflow:'hidden'},{height:h+'px',overflow:'hidden'}],{duration:260,easing:'cubic-bezier(.23,1,.32,1)'})}
+function authShell(inner,{back,step}={}){const A=S.auth,key=(A.stage||'email')+(A.idx||0),anim=key!==A._k;A._k=key;
   return `<div class="auth"><div class="card authc au">
-    <div class="au-top">${back?`<button class="ibtn" data-act="${back}" aria-label="Back">${I.back}</button>`:`<button class="brand brand-btn" data-act="toLanding" aria-label="ResFunder home"><span class="logo" aria-hidden="true"></span>ResFunder</button>`}
-      ${step?`<span class="au-step">Step ${step} of ${total}</span>`:''}<span style="width:36px"></span></div>
-    ${step?`<div class="au-bar" role="progressbar" aria-label="Setup progress" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${step}"><i style="transform:scaleX(${step/total})"></i></div>`:''}
-    <div class="au-body">${inner}</div></div></div>`}
+    <div class="au-top">${back===false?'<span style="width:36px"></span>':`<button class="ibtn" data-act="${back||'toLanding'}" aria-label="Back">${I.back}</button>`}${step?`<span class="au-step">Step ${step} of ${TOTAL}</span>`:''}<span style="width:36px"></span></div>
+    ${step?`<div class="au-bar" role="progressbar" aria-label="Setup progress" aria-valuemin="1" aria-valuemax="${TOTAL}" aria-valuenow="${step}"><i style="transform:scaleX(${step/TOTAL})"></i></div>`:''}
+    <div class="au-body ${anim?(A._dir==='back'?'au-anim-back':'au-anim'):''}">${inner}</div></div></div>`}
 function vAuth(){
-  const A=S.auth,P=pf(),stage=A.stage||'email';
-  if(stage==='email')return authShell(`<h1>Continue with your school email</h1><p class="au-lead">One account for answering and publishing. New here or coming back, start the same way.</p>
-    <div class="fld"><label for="aEmail">School email</label><input class="inp" id="aEmail" data-in="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@umak.edu.ph" value="${esc(A.email)}"><div class="err" id="aEmailErr" role="status"></div></div>
-    <button class="btn ghost au-demo" data-act="demoAuthEmail">Use a demo email</button>
-    <button class="btn dark block" data-act="authEmail">Continue</button>
-    <p class="hint au-center">Your email never goes on the blockchain.</p>`);
-  if(stage==='blocked')return authShell(`<h1>ResFunder is for students 18 and older for now</h1><p class="au-lead">Your account is kept, but it can't answer or publish surveys yet.</p><button class="btn block" data-act="toLanding">Back to the home page</button>`);
-  if(stage==='role')return authShell(`<h1>Who are you?</h1><p class="au-lead">This decides what we ask next. You can't switch later without support.</p>
-    <div class="pf-roles" role="radiogroup" aria-label="Who are you?">
-      <label class="pf-role"><input type="radio" name="pf-role" data-pf="role" value="student" ${P.role==='student'?'checked':''}><span class="ic">${I.users}</span><span><b>Student</b><small>Answer surveys and get paid. Publish your own thesis survey.</small></span></label>
-      <label class="pf-role"><input type="radio" name="pf-role" data-pf="role" value="faculty" ${P.role==='faculty'?'checked':''}><span class="ic">${I.doc}</span><span><b>Faculty or adviser</b><small>Publish surveys and read the decision log of surveys you're invited to.</small></span></label>
-    </div><div class="err" id="aRoleErr" role="status"></div>
-    <button class="btn dark block au-cta" data-act="authRole">Continue</button>`,{back:'authToEmail'});
-  if(stage==='setup'){const fac=P.role==='faculty',i=A.idx||0,total=stepCount(),consent=(two)=>`<div class="pf-consent"><label class="chk"><input type="checkbox" data-pfc="c1" ${P.c1?'checked':''}><span>I've read the privacy notice. ResFunder keeps my email and details off-chain. Only my wallet address and payment records go on the blockchain.</span></label>${two?`<label class="chk"><input type="checkbox" data-pfc="c2" ${P.c2?'checked':''}><span>Researchers see my details only alongside my answers, never my name or email. I can edit or delete them anytime.</span></label>`:''}</div>`;
-    let t='',lead='',f='';
-    if(fac){t='Your role';lead='Advisers can read the decision log of surveys they\'re invited to.';f=`${pills('dept','Department',PF.college)}${pills('frole','Role',PF.frole)}${consent(false)}`}
-    else if(i===0){t='About you';lead='Researchers use this to find the right students. Only ranges, never your birthday.';f=`${pills('age','Age range',PF.age)}${pills('sex','Sex',PF.sex,PREFER)}`}
-    else if(i===1){t='Your school';lead='We filled in your school from your email.';f=`<div class="fld"><label for="pfSchool">School</label><input class="inp au-lock" id="pfSchool" value="${esc(A.school)}" disabled><p class="hint" style="margin:6px 0 0">From your email. <button class="btn ghost au-link" data-act="authToEmail">Not your school? Change email</button></p></div>
-      ${pills('college','College',PF.college)}
-      <div class="fld"><label for="pfProgram">Program or course</label><input class="inp" id="pfProgram" data-pft="program" list="pfPrograms" placeholder="e.g. BS Psychology" value="${esc(P.program)}"><datalist id="pfPrograms">${['BS Psychology','BS Information Technology','BS Computer Science','BS Accountancy','BS Nursing','BS Business Administration','AB Communication'].map(x=>`<option value="${x}">`).join('')}</datalist></div>
-      ${pills('year','Year level',PF.year)}`}
-    else {t='Where you are';lead='Almost done. Your wallet is next.';f=`<div class="fld"><label for="pfRegion">Region</label><select class="inp" id="pfRegion" data-pf="region"><option value="" ${P.region?'':'selected'} disabled>Choose your region</option>${PF.region.map(r=>`<option ${P.region===r?'selected':''}>${r}</option>`).join('')}</select></div>
-      <div class="fld"><label for="pfCity">City or municipality <span class="muted" style="font-weight:400">(optional)</span></label><input class="inp" id="pfCity" data-pft="city" autocomplete="address-level2" value="${esc(P.city)}"></div>
-      ${pills('working','Working student',PF.working,PREFER)}${consent(true)}`}
-    return authShell(`<h1>${t}</h1><p class="au-lead">${lead}</p><div class="pf-form">${f}</div><div class="err" id="aPfErr" role="status"></div><button class="btn dark block au-cta" data-act="authStep">Continue</button>`,{back:'authStepBack',step:i+1,total});}
-  if(stage==='wallet'){const total=stepCount(),fac=P.role==='faculty',W=A.wallet,busy=A.busy;
-    return authShell(`<h1>Your wallet</h1><p class="au-lead">${fac?'This wallet funds your surveys.':'This is where your tBNB payments arrive.'} Connect MetaMask on BSC Testnet.</p>
-      <p class="hint" style="margin:-8px 0 18px">You'll sign a free message to prove the wallet is yours. It costs no gas.</p>
-      ${W?`<div class="au-wallet"><span class="au-wok ${W.verified?'':'unv'}">${W.verified?I.check:I.wallet}</span><span><b class="mono">${shortW(W.addr)}</b><small>${W.verified?'MetaMask · BSC Testnet · verified':'Pasted · not verified'}</small></span><button class="btn ghost" data-act="copyW" data-w="${W.addr}">${I.link}Copy</button></div>`:''}
+  const A=S.auth,P=pf(),stage=A.stage||'email';setTimeout(morphAuth,0);
+  if(stage==='email')return authShell(`<h1>Continue with your email</h1>
+    <div class="fld"><label for="aEmail">Email</label><input class="inp" id="aEmail" data-in="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@example.com" value="${esc(A.email)}"><div class="err" id="aEmailErr" role="status"></div></div>
+    <button class="btn dark block au-cta" data-act="authEmail">Continue</button>`);
+  if(stage==='blocked')return authShell(`<h1>ResFunder is for people 18 and older for now</h1><button class="btn block au-cta" data-act="toLanding">Back to the home page</button>`);
+  if(stage==='who')return authShell(`<h1>Who are you?</h1>
+    <div class="fld"><label for="pfWho">I'm a</label><select class="inp" id="pfWho" data-pf="who"><option value="" ${P.who?'':'selected'} disabled>Choose one</option>${WHO.map(([v,l])=>`<option value="${v}" ${P.who===v?'selected':''}>${l}</option>`).join('')}</select>
+      ${P.who==='other'?`<label class="pf-other"><span>Specify</span><input class="inp" data-pft="whoO" maxlength="60" placeholder="Type here" value="${esc(P.whoO)}"></label>`:''}</div>
+    <div class="err" id="aPfErr" role="status"></div><button class="btn dark block au-cta" data-act="authWho">Continue</button>`,{back:'authStepBack'});
+  if(stage==='setup'){const i=A.idx||0;let t='',f='';
+    if(i===0){t='About you';f=`${pills('age','Age range',PF.age)}${pills('sex','Sex',PF.sex)}`}
+    else if(i===1){t='Where you are';f=`<div class="fld"><label for="pfRegion">Region</label><select class="inp" id="pfRegion" data-pf="region"><option value="" ${P.region?'':'selected'} disabled>Choose your region</option>${PF.region.map(r=>`<option ${P.region===r?'selected':''}>${r}</option>`).join('')}</select></div>
+      <div class="fld"><label for="pfCity">City or municipality</label><input class="inp" id="pfCity" data-pft="city" autocomplete="address-level2" value="${esc(P.city)}"></div>
+      <div class="pf-consent"><label class="chk"><input type="checkbox" data-pfc="c1" ${P.c1?'checked':''}><span>I've read the privacy notice. ResFunder keeps my email and details off-chain. Only my wallet address and payment records go on the blockchain.</span></label>
+      <label class="chk"><input type="checkbox" data-pfc="c2" ${P.c2?'checked':''}><span>Researchers see my details only alongside my answers, never my name or email. I can edit or delete them anytime.</span></label></div>`}
+    else {t='What describes you best';const G=GROUPS[P.who]||GROUPS.other;f=G.map(([label,opts],k)=>pills(k?'g2':'g1',label,opts)).join('')}
+    return authShell(`<h1>${t}</h1><div class="pf-form">${f}</div><div class="err" id="aPfErr" role="status"></div><button class="btn dark block au-cta" data-act="authStep">Continue</button>`,{back:'authStepBack',step:i+1});}
+  if(stage==='wallet'){const W=A.wallet,busy=A.busy;
+    return authShell(`<h1>Your wallet</h1>
+      ${W?`<div class="au-wallet"><span class="au-wok ${W.verified?'':'unv'}">${W.verified?I.check:I.wallet}</span><span><b class="mono">${shortW(W.addr)}</b><small>${W.verified?'MetaMask · verified':'Pasted · not verified'}</small></span></div>`:''}
       <button class="mmbtn" data-act="connectMM" ${busy?'disabled aria-busy="true"':''}><span class="fx">${fx}</span>${busy?'Waiting for MetaMask…':W?'Connect a different wallet':'Connect MetaMask'}</button>
-      <div class="err" id="aWalletErr" role="status" style="text-align:center"></div>
       ${A.paste?`<div class="au-paste"><div class="fld"><label for="aPaste">Wallet address</label><input class="inp mono" id="aPaste" data-in="authPaste" placeholder="0x…" autocapitalize="none" spellcheck="false" value="${esc(A.pasteV||'')}"><div class="err" id="aPasteErr" role="status"></div></div>
-        <p class="hint">Make sure it's yours. Payments to a wrong address can't be undone. A pasted wallet can't answer paid surveys until you connect and sign with it.</p>
         <div class="two-btn"><button class="btn ghost" data-act="authPasteCancel">Cancel</button><button class="btn" data-act="authPasteUse">Use this address</button></div></div>`
       :`<p class="hint au-center">No MetaMask? <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">Install it</a>, or <button class="btn ghost au-link" data-act="authPaste">paste a wallet address instead</button></p>`}
-      <button class="btn dark block au-cta" data-act="authFinish">Finish setup</button>`,{back:'authStepBack',step:total,total});}
-  return authShell(`<div class="au-done"><span class="au-wok">${I.check}</span></div><h1>You're all set</h1><p class="au-lead">${P.role==='faculty'?'You can publish or review now.':'Surveys you can answer are waiting.'}</p><p class="hint">Signed in as <b>${esc(A.email)}</b>.</p><button class="btn dark block au-cta" data-act="authDone">Continue ${I.arrow}</button>`);
+      <div class="err" id="aWalletErr" role="status"></div>
+      <button class="btn dark block au-cta" data-act="authFinish">Finish setup</button>`,{back:'authStepBack',step:TOTAL});}
+  return authShell(`<div class="au-done"><span class="au-wok">${I.check}</span></div><h1>You're all set</h1><button class="btn dark block au-cta" data-act="authDone">Continue ${I.arrow}</button>`,{back:false});
 }
-/* actions for the auth flow, called from act() */
+function go2(stage,idx,dir){const A=S.auth;A._dir=dir||'in';A.stage=stage;if(idx!=null)A.idx=idx;render();try{window.scrollTo({top:0})}catch(e){}}
 function authAct(a,el){const A=S.auth;
   switch(a){
-    case 'demoAuthEmail':A.email='juan.delacruz@umak.edu.ph';render();return true;
-    case 'authEmail':{const r=checkEmail(A.email);if(r.err){setErr('aEmailErr',r.err);return true}
-      A.email=r.email;A.school=r.school;const ex=accounts()[r.email];
-      if(ex&&ex.done){A.pf=ex.pf;A.wallet=ex.wallet;A.stage='done';S.auth.wallet=ex.wallet;render();return true}
-      if(ex){A.pf=ex.pf;A.idx=ex.setup||0;A.wallet=ex.wallet||false;A.stage=ex.role?(ex.setup>=stepCount()-1?'wallet':'setup'):'role';render();toast('Welcome back. Let\'s finish setting up.');return true}
-      A.pf=null;A.idx=0;A.wallet=false;A.stage='role';persist();render();return true}
-    case 'authToEmail':A.stage='email';render();return true;
-    case 'authRole':if(!pf().role){setErr('aRoleErr','Pick Student or Faculty to continue.');return true}A.idx=0;A.stage='setup';persist();render();return true;
-    case 'authStep':{const i=A.idx||0,er=pfError(i);if(er){setErr('aPfErr',er);return true}
-      if(pf().role!=='faculty'&&i===0&&pf().age==='under_18'){A.stage='blocked';persist({blocked:true});render();return true}
-      if(i+1>=stepCount()-1){A.stage='wallet';A.idx=stepCount()-1}else A.idx=i+1;persist();render();try{window.scrollTo({top:0})}catch(e){}return true}
-    case 'authStepBack':if(A.stage==='wallet'){A.stage='setup';A.idx=Math.max(0,stepCount()-2)}else if(A.stage==='setup'){if((A.idx||0)===0)A.stage='role';else A.idx--}else A.stage='email';render();return true;
+    case 'authEmail':{const e=(A.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)){setErr('aEmailErr','Enter your email, like name@example.com.');return true}
+      A.email=e;const ex=accounts()[e];
+      if(ex&&ex.done){A.pf=ex.pf;A.wallet=ex.wallet;go2('done');return true}
+      if(ex){A.pf=ex.pf;A.wallet=ex.wallet||false;go2(ex.stage||'who',ex.idx||0);return true}
+      A.pf=null;A.wallet=false;persist({stage:'who'});go2('who',0);return true}
+    case 'authWho':{const er=stepError('who');if(er){setErr('aPfErr',er);return true}
+      const P=pf();if(P._who!==P.who){P.g1='';P.g1O='';P.g2='';P.g2O='';P._who=P.who}go2('setup',0);persist();return true}
+    case 'authStep':{const i=A.idx||0,er=stepError('setup',i);if(er){setErr('aPfErr',er);return true}
+      if(i===0&&pf().age==='under_18'){persist({stage:'blocked'});go2('blocked');return true}
+      if(i>=2)go2('wallet',3);else go2('setup',i+1);persist();return true}
+    case 'authStepBack':{const s=A.stage,i=A.idx||0;
+      if(s==='wallet')go2('setup',2,'back');else if(s==='setup')i===0?go2('who',0,'back'):go2('setup',i-1,'back');else go2('email',0,'back');return true}
     case 'connectMM':A.busy=true;render();setTimeout(()=>{A.busy=false;A.wallet={addr:MY_WALLET,verified:true};S.auth.wallet=A.wallet;persist();render()},900);return true;
-    case 'authPaste':A.paste=true;render();const pi=document.getElementById('aPaste');if(pi)pi.focus();return true;
+    case 'authPaste':A.paste=true;render();{const pi=document.getElementById('aPaste');if(pi)pi.focus()}return true;
     case 'authPasteCancel':A.paste=false;render();return true;
     case 'authPasteUse':{const v=(A.pasteV||'').trim();if(!/^0x[0-9a-fA-F]{40}$/.test(v)){setErr('aPasteErr','That isn\'t a valid wallet address. It starts with 0x and has 42 characters.');return true}
       A.wallet={addr:v,verified:false};A.paste=false;persist();render();return true}
-    case 'authFinish':if(!A.wallet){setErr('aWalletErr','Connect a wallet to finish setup. Payments and funding use it.');return true}A.stage='done';persist({done:true});render();return true;
+    case 'authFinish':if(!A.wallet){setErr('aWalletErr','Connect or paste a wallet to finish setup.');return true}persist({done:true});go2('done');return true;
   }
   return false}
 
@@ -1544,7 +1549,7 @@ function resInd(Q){const i=Math.min(S.ri,IND.length-1),r=IND[i];
   return `<div class="rnav card"><button class="ibtn" data-ri="-1" aria-label="Previous response" ${i?'':'disabled'}>${I.chevL}</button>
     <label class="qsel" for="riSel">Response<select id="riSel">${IND.map((x,k)=>`<option value="${k}"${k===i?' selected':''}>${rsp(x.num)}</option>`).join('')}</select></label>
     <span class="hint">${i+1} of ${IND.length}</span><button class="ibtn" data-ri="1" aria-label="Next response" ${i<IND.length-1?'':'disabled'}>${I.chev}</button></div>
-  <div class="form" style="margin-top:14px"><div class="fhead"><div class="bar"></div><div class="in"><div class="between"><h3 style="margin:0">${rsp(r.num)}</h3><span class="tp paid">Paid ₱10</span></div>
+  <div class="form" style="margin-top:14px"><div class="fhead"><div class="bar"></div><div class="in"><div class="between"><h3 style="margin:0">${rsp(r.num)}</h3><span class="tp paid">Paid 0.001 tBNB</span></div>
     <dl class="kv" style="margin-top:12px"><dt>Respondent</dt><dd class="mono">${r.wallet}</dd><dt>Submitted</dt><dd>${r.when}</dd><dt>Time taken</dt><dd>${r.took}</dd></dl></div></div>
     ${Q.map((q,k)=>`<div class="fq ind"><p class="qt">${k+1}. ${esc(q.t)}${q.req?' <span class="ast">*</span>':''}</p>${ansBody(q,r.a[k])}</div>`).join('')}</div>`}
 function sResults(s){const Q=s.q,n=s.id==='sleep'?IND.length:s.status==='closed'?s.resp:0;
@@ -1552,7 +1557,7 @@ function sResults(s){const Q=s.q,n=s.id==='sleep'?IND.length:s.status==='closed'
   const tools=`<div class="tabsrow" style="margin-bottom:10px"><div class="tabs fit" role="tablist" aria-label="Results view"><button role="tab" data-rv="all" aria-selected="${S.rv==='all'}">All responses</button><button role="tab" data-rv="ind" aria-selected="${S.rv==='ind'}">Individual</button></div>
     <div class="tools" style="margin:0"><button class="tbtn" data-act="toast" data-msg="${msg('CSV')}">${I.dl}Export CSV</button><button class="tbtn" data-act="toast" data-msg="${msg('an Excel file')}">${I.dl}Export Excel</button></div></div>
     <p class="hint" style="margin:0 0 14px">${n} paid responses · only answers that passed the checks</p>`;
-  if(s.id!=='sleep')return tools+`<div class="card empty"><h3>${n?n+' paid responses ready':'No paid responses yet'}</h3><p>${n?'Export the answers for your analysis.':'Results appear here once students answer.'}</p></div>`;
+  if(s.id!=='sleep'&&CLOSED[s.id])return tools+(S.rv==='ind'?resIndC(s):resAllC(s));if(s.id!=='sleep')return tools+`<div class="card empty"><h3>${n?n+' paid responses ready':'No paid responses yet'}</h3><p>${n?'Export the answers for your analysis.':'Results appear here once students answer.'}</p></div>`;
   if(S.rv==='ind')return tools+resInd(Q);
   const max=Math.max(...RES.q1),q=S.rq3.trim().toLowerCase(),L=RES.q3.filter(a=>!q||a.toLowerCase().includes(q));
   return tools+`<div style="display:grid;gap:14px">
@@ -1623,7 +1628,7 @@ const setErr=(id,m)=>{const e=document.getElementById(id);if(e)e.textContent=m||
 const emailOk=e=>/^[^@\s]+@umak\.edu\.ph$/i.test(e.trim());
 function nextAfter(id,order){const P=order.filter(x=>x!==id&&!S.decided[x]);if(!P.length)return null;const i=order.indexOf(id);return P.find(x=>order.indexOf(x)>i)||P[0]}
 function decide(d,dec,reason){const order=S.order.slice();S.decided[d.id]={d:dec,reason,seq:++S.seq};S.reasonFor=null;S.reason=0;if(S.openRev===d.id)S.openRev=nextAfter(d.id,order);
-  toast(dec==='pay'?`Paid ₱10 to ${d.wallet}`:d.kind==='appeal'?`Kept unpaid: ${d.wallet}`:`Not paid: ${d.wallet}`,()=>{delete S.decided[d.id];S.openRev=d.id;render();toast('Decision undone')})}
+  toast(dec==='pay'?`Paid 0.001 tBNB to ${d.wallet}`:d.kind==='appeal'?`Kept unpaid: ${d.wallet}`:`Not paid: ${d.wallet}`,()=>{delete S.decided[d.id];S.openRev=d.id;render();toast('Decision undone')})}
 function copy(v,msg){try{navigator.clipboard.writeText(v).then(()=>toast(msg),()=>toast(v))}catch(e){toast(v)}}
 function newDraft(){let d=SURVEYS.find(s=>s.status==='draft');
   if(!d){d={id:'new'+SURVEYS.length,code:'SRV-0000'+(15+SURVEYS.length),title:'Untitled survey',status:'draft',resp:0,quota:100,rate:10,deadline:'2026-12-10',closes:'Dec 10',left:'—',desc:'Describe your study in one or two sentences.',q:[{t:'Untitled question',type:'mc',req:true,opts:['Option 1','Option 2']}]};SURVEYS.splice(1,0,d);S.draft[d.id]='build'}
@@ -1642,7 +1647,7 @@ function act(a,el){if(authAct(a,el))return;const s=SV(S.sid);
     case 'connectMM':S.auth.wallet=true;render();toast('MetaMask connected (demo)');break;
     case 'authSkipTry':setErr('aWalletErr','Connect a wallet to continue. It is required to fund surveys.');break;
     case 'authDone':S.authed=true;try{localStorage.setItem('rf-app-authed','1');localStorage.setItem('rf-app-email',S.auth.email)}catch(e){}S.page='dashboard';render();toast('Welcome to ResFunder');break;
-    case 'signOut':S.authed=false;S.landing=true;S.auth={step:0,stage:'email',email:'',code:'',wallet:false,mode:'in',pf:null};try{localStorage.removeItem('rf-app-authed')}catch(e){}render();break;
+    case 'signOut':S.authed=false;S.landing=true;S.auth={step:0,stage:'email',_k:'',email:'',code:'',wallet:false,mode:'in',pf:null};try{localStorage.removeItem('rf-app-authed')}catch(e){}render();break;
     case 'sideOpen':S.sideOpen=true;render();break;
     case 'sideClose':S.sideOpen=false;render();break;
     case 'toast':toast(el.dataset.msg);break;
@@ -1712,7 +1717,7 @@ document.addEventListener('click',e=>{
   if(d.stab){S.stab=d.stab;S.fOpen=false;render();return}
   if(d.fsub){S.fsub=d.fsub;render();return}
   if(d.rv){S.rv=d.rv;render();return}
-  if(d.ri){S.ri=Math.max(0,Math.min(IND.length-1,S.ri+(+d.ri)));render();return}
+  if(d.ri){S.ri=Math.max(0,Math.min(indLen()-1,S.ri+(+d.ri)));render();return}
   if(d.range){S.range=d.range;S.day=DEFDAY[S.range];const c=document.getElementById('chartCard');if(c)c.innerHTML=chartCard();return}
   if(d.day!=null){S.day=+d.day;refreshPlot();return}
   if(d.step){const P=pending(),i=P.findIndex(x=>x.id===S.openRev),j=i+(+d.step);if(i>=0&&j>=0&&j<P.length){S.openRev=P[j].id;S.reasonFor=null;render()}return}
@@ -1728,7 +1733,7 @@ function refreshLog(){const b=document.getElementById('logBody');if(b)b.innerHTM
 function refreshPlot(){const w=document.getElementById('plotWrap');if(w)w.innerHTML=plot()}
 function refreshFund(){const s=SV(S.sid),b=s.rate*s.quota,f=Math.round(b*.05),set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
   set('sB',peso(b));set('sF',peso(f));set('sD',peso(b+f));set('fundLbl','Fund survey '+peso(b+f));setErr('fundErr','')}
-document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.in==='authPaste'){S.auth.pasteV=t.value;const er=document.getElementById('aPasteErr');if(er)er.textContent='';}if(t.dataset&&t.dataset.pft){pf()[t.dataset.pft]=t.value;const er=document.getElementById('aPfErr');if(er)er.textContent='';}});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.in==='crq'){S.crq=t.value;const L=document.getElementById('crqList'),C=CLOSED[S.sid];if(L&&C)L.innerHTML=crqList(C.q2.filter(([a])=>!t.value.trim()||a.toLowerCase().includes(t.value.trim().toLowerCase())),C.paid);}if(t.dataset&&t.dataset.in==='authPaste'){S.auth.pasteV=t.value;const er=document.getElementById('aPasteErr');if(er)er.textContent='';}if(t.dataset&&t.dataset.pft){pf()[t.dataset.pft]=t.value;const er=document.getElementById('aPfErr');if(er)er.textContent='';}});
 document.addEventListener('change',e=>{const t=e.target;if(!t.dataset)return;if(t.dataset.pf){pf()[t.dataset.pf]=t.value;const k=t.dataset.pf;render();const o=document.querySelector('[data-pft="'+k+'O"]');if(o&&t.value==='other')o.focus();else{const r=document.querySelector('input[data-pf="'+k+'"][value="'+t.value+'"]');if(r)r.focus();}}if(t.dataset.pfc){pf()[t.dataset.pfc]=t.checked;const er=document.getElementById('aPfErr');if(er)er.textContent='';}});
 document.addEventListener('input',e=>{const el=e.target,d=el.dataset,s=SV(S.sid);
   if(d.in){const k=d.in,v=el.value;
@@ -1773,6 +1778,35 @@ const labelTables=()=>document.querySelectorAll('table.t').forEach(t=>{const h=[
 try{new MutationObserver(labelTables).observe(document.getElementById('root'),{childList:true,subtree:true})}catch(e){}
 try{fromHash()}catch(e){}
 render();
+/* ================= results for closed surveys ================= */
+const CLOSED={spaces:{q1:[46,29,21,16],quota:120,paid:112,closed:'Oct 30, 2026',
+  q2:[['More outlets for charging laptops',19],['Quieter areas, walang maingay',16],['Longer library hours',14],['Aircon sa study halls',12],['More tables and chairs',11],['Faster Wi-Fi',10],['Group study rooms we can book',9],['Lockers for bags',6],['A place to eat and study at the same time',5],['Better lighting in the canteen',4],['Water refilling stations',3],['Nothing, okay na',3]]}};
+const CLOSED_IND=(()=>{const out={};for(const id in CLOSED){const C=CLOSED[id],seq=[],ans=[],hx='0123456789abcdef';
+  C.q1.forEach((c,i)=>{for(let k=0;k<c;k++)seq.push(i)});C.q2.forEach(([a,c])=>{for(let k=0;k<c;k++)ans.push(a)});
+  const w=i=>{let a='0x',b='';for(let k=0;k<4;k++){a+=hx[(i*5+k*7+2)%16];b+=hx[(i*11+k*3+4)%16]}return a+'…'+b};
+  out[id]=seq.map((v,i)=>({num:9000+C.paid-i,wallet:w(i),when:'Oct '+(30-Math.floor(i/9)),took:(2+i%3)+' min '+((i*17)%60)+' s',a:[seq[(i*37)%seq.length],ans[(i*53)%ans.length]]}))}
+  return out})();
+const indLen=()=>(CLOSED_IND[S.sid]||IND).length;
+function resAllC(s){const C=CLOSED[s.id],Q=s.q,max=Math.max(...C.q1),n=C.paid,q=(S.crq||'').trim().toLowerCase(),L=C.q2.filter(([a])=>!q||a.toLowerCase().includes(q));
+  return `<div class="cr-sum">
+    <div><span>Paid responses</span><b>${n} <small>of ${C.quota}</small></b></div>
+    <div><span>Paid out</span><b>${peso(n*s.rate)}</b></div>
+    <div><span>Refunded at close</span><b>${peso((C.quota-n)*s.rate)}</b></div>
+    <div><span>Closed</span><b>${C.closed}</b></div></div>
+  <div style="display:grid;gap:14px;margin-top:14px">
+    <section class="card pad cr-bars"><div class="between" style="margin-bottom:12px"><h3 class="h">1. ${esc(Q[0].t)}</h3><span class="hint">${n} answers</span></div>
+      ${Q[0].opts.map((o,i)=>`<div class="hbar"><span>${esc(o)}</span><span class="tr"><span style="width:${C.q1[i]/max*100}%"></span></span><span class="n">${C.q1[i]} <small class="muted">· ${Math.round(C.q1[i]/n*100)}%</small></span></div>`).join('')}</section>
+    <section class="card pad"><div class="between"><h3 class="h">2. ${esc(Q[1].t)}</h3><label class="sbox" style="height:40px;max-width:280px">${I.search}<input id="crq" data-in="crq" type="search" placeholder="Search answers" value="${esc(S.crq||'')}" aria-label="Search answers"></label></div>
+      <div id="crqList">${crqList(L,n)}</div></section></div>`}
+function crqList(L,n){return `<p class="hint" style="margin:8px 0 0">${L.length} distinct answers · ${n} total</p><div class="alist">${L.map(([a,c])=>`<div class="cr-row"><span>${esc(a)}</span><span class="cr-n">×${c}</span></div>`).join('')||'<div class="muted">No answers match.</div>'}</div>`}
+function resIndC(s){const D=CLOSED_IND[s.id],i=Math.min(S.ri,D.length-1),r=D[i],Q=s.q;
+  return `<div class="rnav card"><button class="ibtn" data-ri="-1" aria-label="Previous response" ${i?'':'disabled'}>${I.chevL}</button>
+    <label class="qsel" for="riSel">Response<select id="riSel">${D.map((x,k)=>`<option value="${k}"${k===i?' selected':''}>${rsp(x.num)}</option>`).join('')}</select></label>
+    <span class="hint">${i+1} of ${D.length}</span><button class="ibtn" data-ri="1" aria-label="Next response" ${i<D.length-1?'':'disabled'}>${I.chev}</button></div>
+  <div class="form" style="margin-top:14px"><div class="fhead"><div class="bar"></div><div class="in"><div class="between"><h3 style="margin:0">${rsp(r.num)}</h3><span class="tp paid">Paid ${peso(s.rate)}</span></div>
+    <dl class="kv" style="margin-top:12px"><dt>Respondent</dt><dd class="mono">${r.wallet}</dd><dt>Submitted</dt><dd>${r.when}</dd><dt>Time taken</dt><dd>${r.took}</dd></dl></div></div>
+    ${Q.map((q,k)=>`<div class="fq ind"><p class="qt">${k+1}. ${esc(q.t)}${q.req?' <span class="ast">*</span>':''}</p>${ansBody(q,r.a[k])}</div>`).join('')}</div>`}
+
 /* ================= landing (shown before sign-in) ================= */
 function vLanding(){
   const steps=[['01','Researcher','Build survey','Google Forms-style builder, five question types.'],['02','Researcher','Fund and lock','Rate × quota + a flat fee per response, locked in tBNB.'],['03','Respondent','Sign in','School email and a verified MetaMask wallet. One submission each.'],['04','Respondent','Answer','Consent and answers. Paid to your verified wallet.'],['05','Code','Code checks','Speed, straight-lining, duplicate text.'],['06','AI','AI label','Labelled twice; flags injection. Can only escalate.'],['07','Rule engine','Decide','Plain code turns signals into Pay, Review or Don\'t pay.']];
