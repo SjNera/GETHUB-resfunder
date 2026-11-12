@@ -1,7 +1,7 @@
 // Lane C. Screening and payment for one response. Source: docs/TDD.md sections 11.3 and 11.4.
 // Server only. The decision row is saved before any transaction is sent, and the tx hash is saved
 // before waiting for the receipt.
-import { ApiFailure } from '../api/errors';
+import { ApiFailure, safeErrorText } from '../api/errors';
 import { explorerUrl, type ResponseResult } from '../api/shapes';
 import { reasonHash } from '../canonical';
 import { getReceiptStatus, sendDecision, waitForReceipt, type ReceiptStatus } from '../chain/escrow';
@@ -46,10 +46,49 @@ function buildPrior(survey: SurveyJson, prior: PriorResponse[]): ScreenInput['pr
   return { openTexts, durationsMs: prior.map((p) => p.durationMs) };
 }
 
-function errorText(err: unknown): string {
-  const short = (err as { shortMessage?: unknown } | null)?.shortMessage;
-  const text = typeof short === 'string' ? short : err instanceof Error ? err.message : String(err);
-  return text.slice(0, MAX_ERROR_CHARS);
+const MAX_REASONS = 20;
+const MAX_REASON_CHARS = 500;
+
+function reviewOutput(reason: string, from?: ScreenOutput): ScreenOutput {
+  return {
+    result: 'review',
+    reasons: [...(from?.reasons ?? []), reason].slice(-MAX_REASONS),
+    signals: from?.signals ?? { hardFails: [], weak: [] },
+    ai: from?.ai ?? null,
+    llmModel: from?.llmModel ?? null,
+    rubricVersion: from?.rubricVersion ?? 'error',
+  };
+}
+
+function isWellFormed(out: ScreenOutput): boolean {
+  return (
+    (out.result === 'pay' || out.result === 'review' || out.result === 'dont_pay') &&
+    Array.isArray(out.reasons) &&
+    out.reasons.every((r) => typeof r === 'string') &&
+    Array.isArray(out.signals?.hardFails) &&
+    Array.isArray(out.signals?.weak) &&
+    typeof out.rubricVersion === 'string'
+  );
+}
+
+/**
+ * Last check before money moves. AGENTS.md rules 1 and 2, enforced again outside the screening code:
+ * Don't pay needs a code-confirmed hard fail, and Pay is never allowed with a hard fail or with an
+ * AI label that is not a clean, agreed "valid". Anything else becomes Review. It never turns a
+ * result into Pay or Don't pay.
+ */
+export function guardScreenOutput(out: ScreenOutput): ScreenOutput {
+  if (!isWellFormed(out)) return reviewOutput('Screening error, sent to review.');
+  const safe: ScreenOutput = {
+    ...out,
+    reasons: out.reasons.slice(0, MAX_REASONS).map((r) => r.slice(0, MAX_REASON_CHARS)),
+  };
+  if (safe.result === 'review') return safe;
+
+  const hardFail = safe.signals.hardFails.length > 0;
+  const aiClean = safe.ai === null || (safe.ai.label === 'valid' && !safe.ai.injection && safe.ai.agreed);
+  const allowed = safe.result === 'dont_pay' ? hardFail : !hardFail && aiClean;
+  return allowed ? safe : reviewOutput('The screening result did not pass the payment safety check.', safe);
 }
 
 /** Step 8: success confirms, reverted fails to review, pending changes nothing. */
@@ -57,7 +96,7 @@ async function applyReceipt(decision: Pick<DecisionRow, 'id' | 'result'>, receip
   if (receipt.state === 'success') {
     await confirmDecision(decision.id, decision.result === 'pay' ? 'paid' : 'blocked');
   } else if (receipt.state === 'reverted') {
-    await failDecision(decision.id, receipt.error.slice(0, MAX_ERROR_CHARS));
+    await failDecision(decision.id, safeErrorText(receipt.error, MAX_ERROR_CHARS));
   }
 }
 
@@ -102,21 +141,16 @@ export async function processResponse(responseId: string): Promise<ResponseResul
   // 3. Screen. screen() never throws; if it ever does, the response goes to review.
   let out: ScreenOutput;
   try {
-    out = await screen({
-      survey: survey.survey,
-      answers: response.answers,
-      durationMs: response.submittedAt.getTime() - response.startedAt.getTime(),
-      prior,
-    });
+    out = guardScreenOutput(
+      await screen({
+        survey: survey.survey,
+        answers: response.answers,
+        durationMs: response.submittedAt.getTime() - response.startedAt.getTime(),
+        prior,
+      }),
+    );
   } catch {
-    out = {
-      result: 'review',
-      reasons: ['Screening error, sent to review.'],
-      signals: { hardFails: [], weak: [] },
-      ai: null,
-      llmModel: null,
-      rubricVersion: 'error',
-    };
+    out = reviewOutput('Screening error, sent to review.');
   }
 
   // 4. Save the decision first. 5. A review decision also moves the response to 'review'.
@@ -144,7 +178,7 @@ export async function processResponse(responseId: string): Promise<ResponseResul
       reasonHash: hash,
     });
   } catch (err) {
-    await failDecision(decision.id, errorText(err));
+    await failDecision(decision.id, safeErrorText(err, MAX_ERROR_CHARS));
     return currentResult(responseId);
   }
 

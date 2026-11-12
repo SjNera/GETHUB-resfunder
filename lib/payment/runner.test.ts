@@ -5,7 +5,7 @@ import * as chain from '../chain/escrow';
 import * as db from '../db/memory';
 import * as screening from '../screening';
 import type { Answers, Hex, ScreenOutput, SurveyJson } from '../types';
-import { getResponseResult, processResponse, recheckSent } from './runner';
+import { getResponseResult, guardScreenOutput, processResponse, recheckSent } from './runner';
 
 vi.mock('../db/queries', () => import('../db/memory'));
 vi.mock('../chain/escrow', () => ({
@@ -29,9 +29,15 @@ const answers: Answers = {
   q8: 'I use short timed sessions because they keep me from drifting.',
 };
 
-function output(result: ScreenOutput['result'], reasons = ['ok']): ScreenOutput {
-  return { result, reasons, signals: { hardFails: [], weak: [] }, ai: null, llmModel: 'm', rubricVersion: 'v1' };
+/** A dont_pay output carries the code-confirmed hard fail that rule 1 requires. */
+function output(result: ScreenOutput['result'], reasons = ['ok'], extra: Partial<ScreenOutput> = {}): ScreenOutput {
+  const hardFails = result === 'dont_pay' ? [{ check: 'gibberish' as const, questionId: 'q7' }] : [];
+  return { result, reasons, signals: { hardFails, weak: [] }, ai: null, llmModel: 'm', rubricVersion: 'v1', ...extra };
 }
+
+const ai = (over: Partial<NonNullable<ScreenOutput['ai']>> = {}): NonNullable<ScreenOutput['ai']> => ({
+  label: 'valid', type: null, injection: false, reason: 'Looks like a real answer.', agreed: true, ...over,
+});
 
 let events: string[];
 
@@ -128,6 +134,74 @@ describe('processResponse', () => {
     expect(res).toMatchObject({ status: 'review', result: 'review', txHash: null, explorerUrl: null });
     expect((await db.getDecision(id))?.status).toBe('off_chain');
     expect(chain.sendDecision).not.toHaveBeenCalled();
+  });
+
+  it('pays when the AI label is a clean, agreed valid', async () => {
+    vi.mocked(screening.screen).mockResolvedValue(output('pay', ['Passed all checks.'], { ai: ai() }));
+    const id = await addResponse();
+    expect((await processResponse(id)).status).toBe('paid');
+  });
+
+  it('dont_pay without a code-confirmed hard fail goes to review, off chain', async () => {
+    vi.mocked(screening.screen).mockResolvedValue(
+      output('dont_pay', ['The AI said no.'], { signals: { hardFails: [], weak: [] }, ai: ai({ label: 'non_answer', type: 'evasive' }) }),
+    );
+    const id = await addResponse();
+    const res = await processResponse(id);
+    expect(res).toMatchObject({ status: 'review', result: 'review', txHash: null });
+    expect(res.reasons).toEqual(['The AI said no.', 'The screening result did not pass the payment safety check.']);
+    expect((await db.getDecision(id))?.status).toBe('off_chain');
+    expect(chain.sendDecision).not.toHaveBeenCalled();
+  });
+
+  it('pay is refused when the AI label is not a clean, agreed valid, or a hard fail exists', async () => {
+    const unsafe: Partial<ScreenOutput>[] = [
+      { ai: ai({ label: 'unclear', type: 'other' }) },
+      { ai: ai({ label: 'non_answer', type: 'off_question' }) },
+      { ai: ai({ injection: true }) },
+      { ai: ai({ agreed: false }) },
+      { signals: { hardFails: [{ check: 'empty', questionId: 'q7' }], weak: [] } },
+    ];
+    for (const [i, extra] of unsafe.entries()) {
+      vi.mocked(screening.screen).mockResolvedValue(output('pay', ['ok'], extra));
+      const id = await addResponse('0x' + String(i + 2).repeat(40));
+      expect(await processResponse(id)).toMatchObject({ status: 'review', result: 'review', txHash: null });
+    }
+    expect(chain.sendDecision).not.toHaveBeenCalled();
+  });
+
+  it('a malformed screening result goes to review, never pay', async () => {
+    const malformed = [
+      { ...output('pay'), result: 'approve' },
+      { ...output('pay'), reasons: 'ok' },
+      { ...output('pay'), signals: undefined },
+      null,
+    ];
+    for (const [i, bad] of malformed.entries()) {
+      vi.mocked(screening.screen).mockResolvedValue(bad as unknown as ScreenOutput);
+      const id = await addResponse('0x' + String(i + 2).repeat(40));
+      expect(await processResponse(id)).toMatchObject({ status: 'review', result: 'review', txHash: null });
+    }
+    expect(chain.sendDecision).not.toHaveBeenCalled();
+  });
+
+  it('caps the number and length of reasons', () => {
+    const long = guardScreenOutput(output('pay', Array.from({ length: 50 }, () => 'x'.repeat(2000))));
+    expect(long.result).toBe('pay');
+    expect(long.reasons).toHaveLength(20);
+    expect(long.reasons[0]).toHaveLength(500);
+  });
+
+  it('stores a failed send without URLs or 32-byte hex values', async () => {
+    vi.mocked(chain.sendDecision).mockRejectedValue(
+      new Error(`HTTP request failed. URL: https://rpc.example/v1/SECRETKEY key 0x${'9f'.repeat(32)}`),
+    );
+    const id = await addResponse();
+    await processResponse(id);
+    const error = (await db.getDecision(id))?.error ?? '';
+    expect(error).toContain('HTTP request failed.');
+    expect(error).not.toContain('SECRETKEY');
+    expect(error).not.toContain('9f9f9f');
   });
 
   it('a second call is a no-op', async () => {
