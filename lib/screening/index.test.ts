@@ -119,6 +119,51 @@ describe('screen', () => {
     expect(out.rubricVersion).toBe('v1');
   });
 
+  it('one weak signal with a valid AI label still pays and keeps its sentence', async () => {
+    const out = await screenWith({ ...input(CLEAN), durationMs: 100 }, deps(async () => VALID).deps);
+    expect(out.result).toBe('pay');
+    expect(out.signals.weak).toEqual(['too_fast']);
+    expect(out.reasons).toEqual(['The survey was completed unusually fast.']);
+  });
+
+  it('two weak signals go to review even with a valid AI label, without the AI reason', async () => {
+    const d = deps(async () => VALID, { runChecks: () => ({ hardFails: [], weak: ['too_fast', 'straight_lining'] }) });
+    const out = await screenWith(input(CLEAN), d.deps);
+    expect(out.result).toBe('review');
+    expect(out.reasons).toEqual([
+      'The survey was completed unusually fast.',
+      'The same option was chosen many times in a row.',
+    ]);
+  });
+
+  it('puts code reasons first and the AI reason last', async () => {
+    const out = await screenWith({ ...input(CLEAN), durationMs: 100 }, deps(async () => NON_ANSWER).deps);
+    expect(out.result).toBe('review');
+    expect(out.reasons).toEqual(['The survey was completed unusually fast.', 'Filler only.']);
+  });
+
+  it('does not send a blank optional answer to the AI', async () => {
+    const d = deps(async () => VALID);
+    await screenWith(input({ ...CLEAN, q3: '  ' }), d.deps);
+    expect(d.labelAnswer).toHaveBeenCalledExactlyOnceWith('How do you study?', CLEAN.q2);
+  });
+
+  it('a duplicate of an earlier response is dont_pay without calling the AI', async () => {
+    const d = deps(async () => VALID);
+    const i = { ...input(CLEAN), prior: { openTexts: { q2: [CLEAN.q2.toLowerCase()] }, durationsMs: [] } };
+    const out = await screenWith(i, d.deps);
+    expect(out.result).toBe('dont_pay');
+    expect(out.reasons).toEqual(['An open-ended answer matched another response in this survey.']);
+    expect(d.labelAnswer).not.toHaveBeenCalled();
+  });
+
+  it('never returns pay or dont_pay because of the AI alone', async () => {
+    for (const ai of [NON_ANSWER, INJECTION, DISAGREED]) {
+      const out = await screenWith(input(CLEAN), deps(async () => ai).deps);
+      expect(out.result).toBe('review');
+    }
+  });
+
   it('screen() never throws on malformed input', async () => {
     const out = await screen({ survey: null } as unknown as ScreenInput);
     expect(out.result).toBe('review');
