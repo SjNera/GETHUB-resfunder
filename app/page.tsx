@@ -10,7 +10,7 @@ const facts = ["BNB Smart Chain testnet", "Paid in testnet BNB (tBNB)", "Answers
 const steps = [
   { n: "01", who: "Researcher", title: "Create survey", body: "Multiple choice, scale and open-ended questions." },
   { n: "02", who: "Researcher", title: "Fund and lock", body: "Rate × quota + a flat fee per response, locked in tBNB." },
-  { n: "03", who: "Respondent", title: "Connect wallet", body: "MetaMask and a free signed message. One submission per wallet and email." },
+  { n: "03", who: "Respondent", title: "Sign in", body: "School email and a verified MetaMask wallet. One submission each." },
   { n: "04", who: "Respondent", title: "Answer", body: "Consent and answers. Paid to your verified wallet." },
   { n: "05", who: "Code", title: "Code checks", body: "Speed, straight-lining, duplicate text." },
   { n: "06", who: "AI", title: "AI label", body: "Labelled twice; flags injection. Can only escalate." },

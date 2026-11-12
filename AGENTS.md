@@ -51,7 +51,7 @@ resfunder/
 │   ├── types.ts               FROZEN
 │   ├── canonical.ts           FROZEN
 │   ├── survey-schema.ts       Lane C   (surveySchema, validateAnswers; shared by UI and server)
-│   ├── ui/                    UI       (browser helpers: cn, format, fees, links, wallet, survey-tabs)
+│   ├── ui/                    UI       (browser helpers: cn, format, fees, links, survey-tabs; auth/ = demo sign-in store)
 │   ├── chain/                 Lane A   (abi.ts, client.ts, fee.ts, escrow.ts)
 │   ├── screening/             Lane B   (checks.ts, llm.ts, prompt.ts, rules.ts, index.ts)
 │   ├── db/                    Lane C   (schema.sql FROZEN, client.ts, queries.ts)

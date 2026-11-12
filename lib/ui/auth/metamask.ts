@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * Raw MetaMask (EIP-1193) helpers: provider detection, mobile deep link, BSC testnet switch,
- * friendly error text, and address paste checks. Task U1 wires sign-in through wagmi and
- * signs buildAuthMessage() from lib/auth/message.ts; nothing here builds a sign-in message.
+ * Connect MetaMask, move it to BSC Testnet (chain 97), and prove ownership
+ * with a free personal_sign message. In the real app the nonce comes from the
+ * server and the server verifies the signature; this demo verifies it in the
+ * browser with viem so the flow works without a backend.
  */
-import { getAddress, isAddress } from "viem";
+import { getAddress, isAddress, toHex, verifyMessage } from "viem";
 
-export type Eip1193 = {
+type Eip1193 = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
   isMetaMask?: boolean;
 };
@@ -46,7 +47,7 @@ export class WalletError extends Error {
 
 const code = (e: unknown) => (e as { code?: number })?.code;
 
-export function friendlyWalletError(e: unknown, stage: ConnectStage): WalletError {
+function friendly(e: unknown, stage: ConnectStage): WalletError {
   if (code(e) === -32002) return new WalletError("pending", "Open MetaMask to finish.");
   if (code(e) === 4001) {
     if (stage === "account") return new WalletError("rejected", "You cancelled the connection. Connect when you're ready.");
@@ -56,7 +57,7 @@ export function friendlyWalletError(e: unknown, stage: ConnectStage): WalletErro
   return new WalletError("unknown", "Something went wrong in MetaMask. Try again.");
 }
 
-export async function ensureBscTestnet(provider: Eip1193) {
+async function ensureBscTestnet(provider: Eip1193) {
   const chainId = (await provider.request({ method: "eth_chainId" })) as string;
   if (chainId?.toLowerCase() === BSC_TESTNET.chainId) return;
   try {
@@ -67,6 +68,45 @@ export async function ensureBscTestnet(provider: Eip1193) {
     } else {
       throw e;
     }
+  }
+}
+
+export function linkMessage(email: string, nonce: string, at: Date) {
+  return `ResFunder: link this wallet to ${email}.\nCode ${nonce}.\n${at.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+function nonce() {
+  const bytes = crypto.getRandomValues(new Uint8Array(5));
+  return Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").toUpperCase().slice(0, 8);
+}
+
+/** The whole connect-and-sign sequence. Returns the checksummed, verified address. */
+export async function connectAndSign(email: string, onStage?: (s: ConnectStage) => void): Promise<`0x${string}`> {
+  const provider = getProvider();
+  if (!provider) throw new WalletError("no_provider", "MetaMask isn't installed in this browser.");
+
+  let stage: ConnectStage = "account";
+  try {
+    onStage?.(stage);
+    const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+    if (!accounts?.[0]) throw new WalletError("rejected", "You cancelled the connection. Connect when you're ready.");
+    const address = getAddress(accounts[0]);
+
+    stage = "network";
+    onStage?.(stage);
+    await ensureBscTestnet(provider);
+
+    stage = "sign";
+    onStage?.(stage);
+    const message = linkMessage(email, nonce(), new Date());
+    const signature = (await provider.request({ method: "personal_sign", params: [toHex(message), address] })) as `0x${string}`;
+
+    const ok = await verifyMessage({ address, message, signature });
+    if (!ok) throw new WalletError("signature", "We couldn't verify that signature. Try again.");
+    return address;
+  } catch (e) {
+    if (e instanceof WalletError) throw e;
+    throw friendly(e, stage);
   }
 }
 

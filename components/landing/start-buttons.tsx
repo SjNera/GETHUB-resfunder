@@ -46,9 +46,9 @@ const PAGES: Record<Path, { label: string; done: string; pages: Page[] }> = {
     pages: [
       {
         icon: <MailCheck />,
-        title: "Connect your wallet",
-        body: "Connect MetaMask, sign a free message and enter your email. Each wallet and email can answer a survey once.",
-        fact: "No gas needed to answer",
+        title: "Sign up once, with your wallet",
+        body: "Verify your school email, then connect MetaMask and sign a free message. Each wallet and email can answer a survey once.",
+        fact: "One account for publishing and answering",
       },
       {
         icon: <Inbox />,
