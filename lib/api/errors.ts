@@ -27,33 +27,110 @@ export class ApiFailure extends Error {
   }
 }
 
+/** Sent on every API response: never cached (the log holds emails), never sniffed. */
+export const API_HEADERS: Record<string, string> = {
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+};
+
 export function errorResponse(code: ErrorCode, message: string): Response {
   const body: ApiError = { error: { code, message } };
-  return Response.json(body, { status: STATUS_BY_CODE[code] });
+  return Response.json(body, { status: STATUS_BY_CODE[code], headers: API_HEADERS });
 }
 
-/** Reads a JSON body. Bad JSON is INVALID_INPUT. */
-export async function readJson(request: Request): Promise<unknown> {
+const MAX_ERROR_CHARS = 300;
+
+/**
+ * Error text that is safe to log or store: one line, capped, with URLs (an RPC or database URL can
+ * carry a key) and 32-byte hex values (the size of a private key) removed.
+ */
+export function safeErrorText(err: unknown, maxChars: number = MAX_ERROR_CHARS): string {
+  const short = (err as { shortMessage?: unknown } | null)?.shortMessage;
+  const text = typeof short === 'string' ? short : err instanceof Error ? err.message : String(err);
+  return text
+    .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '[url]')
+    .replace(/(?:0x)?[0-9a-fA-F]{64}/g, '[hex]')
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .trim()
+    .slice(0, maxChars);
+}
+
+/** Largest JSON body a route reads. A full survey or 30 long answers fit well inside it. */
+export const MAX_BODY_BYTES = 512 * 1024;
+
+function tooLarge(): ApiFailure {
+  return new ApiFailure('INVALID_INPUT', 'The request body is too large.');
+}
+
+/** Reads the body up to maxBytes and stops reading as soon as it is over. */
+async function readCapped(request: Request, maxBytes: number): Promise<Uint8Array> {
+  const declared = request.headers.get('content-length');
+  if (declared !== null && (!/^\d{1,15}$/.test(declared) || Number(declared) > maxBytes)) throw tooLarge();
+  if (!request.body) return new Uint8Array(0);
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+/**
+ * Reads a JSON body. The content type must be application/json, the size at most maxBytes, the
+ * bytes valid UTF-8, and the value a JSON object. Anything else is INVALID_INPUT.
+ */
+export async function readJson(request: Request, maxBytes: number = MAX_BODY_BYTES): Promise<unknown> {
+  const type = (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (type !== 'application/json') {
+    throw new ApiFailure('INVALID_INPUT', 'Send the request body as application/json.');
+  }
+  let bytes: Uint8Array;
   try {
-    return await request.json();
+    bytes = await readCapped(request, maxBytes);
+  } catch (err) {
+    if (err instanceof ApiFailure) throw err;
+    throw new ApiFailure('INVALID_INPUT', 'The request body could not be read.');
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   } catch {
     throw new ApiFailure('INVALID_INPUT', 'The request body is not valid JSON.');
   }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ApiFailure('INVALID_INPUT', 'The request body must be a JSON object.');
+  }
+  return value;
 }
 
 /** Runs a route body and maps the outcome to a JSON response. */
 export async function respond(run: () => Promise<unknown>): Promise<Response> {
   try {
-    return Response.json(await run());
+    return Response.json(await run(), { headers: API_HEADERS });
   } catch (err) {
     if (err instanceof ApiFailure) return errorResponse(err.code, err.message);
     if (err instanceof ZodError) {
       const issue = err.issues[0];
-      const where = issue && issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
-      return errorResponse('INVALID_INPUT', issue ? `${where}${issue.message}` : 'Invalid input.');
+      const where = issue && issue.path.length > 0 ? `${issue.path.join('.').slice(0, 80)}: ` : '';
+      return errorResponse('INVALID_INPUT', issue ? `${where}${issue.message}`.slice(0, 300) : 'Invalid input.');
     }
-    // Message only. Never log request bodies or secrets.
-    console.error('API error:', err instanceof Error ? err.message : String(err));
+    // Scrubbed message only. Never log request bodies or secrets.
+    console.error('API error:', safeErrorText(err));
     return errorResponse('INTERNAL', 'Something went wrong. Try again.');
   }
 }

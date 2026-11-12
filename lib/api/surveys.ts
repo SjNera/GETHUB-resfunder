@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { verifyResearcher } from '../auth/signature';
 import { surveyHash } from '../canonical';
-import { readClosed, readSurveyCreated } from '../chain/escrow';
+import { readClosed, readSurveyCreated, type SurveyCreatedEvent } from '../chain/escrow';
 import { getSurvey, insertSurvey, listSurveysByResearcher, setSurveyClosed, type SurveyRow } from '../db/queries';
 import { surveySchema } from '../survey-schema';
 import type { Hex, SurveyJson } from '../types';
@@ -34,6 +34,27 @@ export function toSummary(row: SurveyRow): SurveySummary {
   };
 }
 
+const PG_INT_MAX = 2_147_483_647;
+
+/**
+ * Event values are chosen by whoever funded the survey, so they are range-checked before they
+ * reach the database. Id 0 is refused because the list_surveys auth message uses it.
+ */
+function eventInRange(ev: SurveyCreatedEvent): boolean {
+  return (
+    Number.isSafeInteger(ev.surveyId) &&
+    ev.surveyId > 0 &&
+    /^0x[0-9a-fA-F]{40}$/.test(ev.researcher) &&
+    Number.isSafeInteger(ev.quota) &&
+    ev.quota > 0 &&
+    ev.quota <= PG_INT_MAX &&
+    Number.isSafeInteger(ev.deadline) &&
+    ev.deadline > 0 &&
+    ev.rate > BigInt(0) &&
+    ev.feePerResponse >= BigInt(0)
+  );
+}
+
 /** R2. The chain event is the source of truth; the browser only supplies the tx hash and the JSON. */
 export async function registerSurvey(body: unknown): Promise<RegisterResult> {
   const input = registerBodySchema.parse(body);
@@ -42,6 +63,9 @@ export async function registerSurvey(body: unknown): Promise<RegisterResult> {
 
   const ev = await readSurveyCreated(txHash);
   if (!ev) throw new ApiFailure('TX_NOT_VERIFIED', 'No SurveyCreated event was found for this transaction.');
+  if (!eventInRange(ev)) {
+    throw new ApiFailure('TX_NOT_VERIFIED', 'The funded survey has values this app cannot store.');
+  }
   if (surveyHash(survey).toLowerCase() !== ev.surveyHash.toLowerCase()) {
     throw new ApiFailure('HASH_MISMATCH', 'The survey does not match the hash that was funded.');
   }
@@ -57,6 +81,13 @@ export async function registerSurvey(body: unknown): Promise<RegisterResult> {
     feePerResponseWei: ev.feePerResponse,
     txHash,
   });
+
+  // The insert does nothing when the id is taken. Make sure the stored row is this transaction's
+  // survey (it would not be after a redeploy that reuses ids against an old database).
+  const stored = await getSurvey(ev.surveyId);
+  if (!stored || stored.txHash.toLowerCase() !== txHash) {
+    throw new ApiFailure('TX_NOT_VERIFIED', 'This survey id is already registered from another transaction.');
+  }
   return { surveyId: ev.surveyId, sharePath: `/s/${ev.surveyId}` };
 }
 

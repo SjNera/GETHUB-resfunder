@@ -7,7 +7,7 @@ import { surveyHash } from '../canonical';
 import * as chain from '../chain/escrow';
 import * as db from '../db/memory';
 import { ERROR_CODES, type Answers, type AuthAction, type Hex, type SurveyJson } from '../types';
-import { parseResponseId, respond, STATUS_BY_CODE } from './errors';
+import { parseResponseId, readJson, respond, safeErrorText, STATUS_BY_CODE } from './errors';
 import { getLog } from './log';
 import { submitResponse } from './submit';
 import { getSurveyDetails, listSurveys, markSurveyClosed, parseSurveyId, registerSurvey } from './surveys';
@@ -98,7 +98,7 @@ function expectError(res: { status: number; json: Json }, code: (typeof ERROR_CO
 
 beforeEach(() => {
   db.reset();
-  vi.stubEnv('HASH_SECRET', 'test-secret');
+  vi.stubEnv('HASH_SECRET', 'test-secret-'.repeat(4));
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.mocked(chain.readSurveyCreated).mockReset().mockResolvedValue(null);
   vi.mocked(chain.readClosed).mockReset().mockResolvedValue(null);
@@ -132,6 +132,75 @@ describe('error mapping', () => {
     expect(() => parseSurveyId('-1')).toThrow();
     expect(parseSurveyId('12')).toBe(12);
     expect(() => parseResponseId('not-a-uuid')).toThrow();
+  });
+
+  it('marks every response as not cacheable and not sniffable', async () => {
+    const ok = await respond(async () => ({ fine: true }));
+    const failed = await respond(async () => {
+      throw new Error('boom');
+    });
+    for (const res of [ok, failed]) {
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    }
+  });
+
+  it('logs unexpected errors without URLs, keys or line breaks', async () => {
+    const key = `0x${'7a'.repeat(32)}`;
+    await respond(async () => {
+      throw new Error(`fetch failed\nURL: https://rpc.example/v3/SECRETKEY and postgres://user:pw@host/db key ${key}`);
+    });
+    const logged = vi.mocked(console.error).mock.calls[0].join(' ');
+    expect(logged).toContain('fetch failed');
+    expect(logged).not.toMatch(/SECRETKEY|user:pw|7a7a7a|\n/);
+    expect(safeErrorText({ shortMessage: 'nonce too low', message: 'long text https://x.example/key' })).toBe('nonce too low');
+    expect(safeErrorText('x'.repeat(1000))).toHaveLength(300);
+  });
+});
+
+describe('readJson', () => {
+  function post(body: BodyInit, headers: Record<string, string> = { 'content-type': 'application/json' }): Request {
+    return new Request('http://localhost/api/submit', { method: 'POST', body, headers });
+  }
+  const invalid = async (request: Request, maxBytes?: number) =>
+    expectError(await call(() => readJson(request, maxBytes)), 'INVALID_INPUT');
+
+  it('reads a JSON object', async () => {
+    expect(await readJson(post('{"a":1}'))).toEqual({ a: 1 });
+    expect(await readJson(post('{"a":"ñ 😀"}', { 'content-type': 'application/json; charset=utf-8' }))).toEqual({ a: 'ñ 😀' });
+  });
+
+  it('rejects another content type', async () => {
+    await invalid(post('{"a":1}', { 'content-type': 'text/plain' }));
+    await invalid(post('a=1', { 'content-type': 'application/x-www-form-urlencoded' }));
+    await invalid(post('{"a":1}', {}));
+  });
+
+  it('rejects a body over the limit, with or without a content-length header', async () => {
+    const big = JSON.stringify({ a: 'x'.repeat(200) });
+    await invalid(post(big), 100);
+    await invalid(post(big, { 'content-type': 'application/json', 'content-length': '5' }), 100);
+    await invalid(post('{}', { 'content-type': 'application/json', 'content-length': '999999999' }), 100);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < 10; i++) controller.enqueue(new TextEncoder().encode('x'.repeat(50)));
+        controller.close();
+      },
+    });
+    const streamed = new Request('http://localhost/api/submit', {
+      method: 'POST', body: stream, headers: { 'content-type': 'application/json' }, duplex: 'half',
+    } as RequestInit);
+    await invalid(streamed, 100);
+    expect(await readJson(post(big), 1000)).toEqual(JSON.parse(big));
+  });
+
+  it('rejects bad JSON, bad UTF-8, an empty body and non-objects', async () => {
+    await invalid(post('{"a":'));
+    await invalid(post(new Uint8Array([0x7b, 0x22, 0xff, 0x22, 0x3a, 0x31, 0x7d])));
+    await invalid(post(''));
+    await invalid(post('[1,2]'));
+    await invalid(post('null'));
+    await invalid(post('"text"'));
   });
 });
 
@@ -177,6 +246,31 @@ describe('R2 register', () => {
     expectError(await call(() => registerSurvey({ txHash: TX, survey: { ...survey, questions: [] } })), 'INVALID_INPUT');
     expectError(await call(() => registerSurvey(null)), 'INVALID_INPUT');
     expect(chain.readSurveyCreated).not.toHaveBeenCalled();
+  });
+
+  it('TX_NOT_VERIFIED when the event holds values the database cannot store', async () => {
+    const outOfRange: Partial<chain.SurveyCreatedEvent>[] = [
+      { quota: 2_147_483_648 },
+      { quota: 0 },
+      { quota: 1.5 },
+      { surveyId: 0 },
+      { surveyId: Number.MAX_SAFE_INTEGER + 2 },
+      { deadline: Number.POSITIVE_INFINITY },
+      { rate: BigInt(0) },
+      { researcher: 'not-a-wallet' },
+    ];
+    for (const overrides of outOfRange) {
+      vi.mocked(chain.readSurveyCreated).mockResolvedValue(createdEvent(overrides));
+      expectError(await call(() => registerSurvey({ txHash: TX, survey })), 'TX_NOT_VERIFIED');
+    }
+    expect(await db.getSurvey(SURVEY_ID)).toBeNull();
+  });
+
+  it('TX_NOT_VERIFIED when the survey id is already registered from another transaction', async () => {
+    vi.mocked(chain.readSurveyCreated).mockResolvedValue(createdEvent());
+    await registerSurvey({ txHash: TX, survey });
+    expectError(await call(() => registerSurvey({ txHash: CLOSE_TX, survey })), 'TX_NOT_VERIFIED');
+    expect((await db.getSurvey(SURVEY_ID))?.txHash).toBe(TX_LOWER);
   });
 });
 
@@ -291,6 +385,37 @@ describe('R5 submit', () => {
     expectError(await bad({ startedAt: Date.now() - 25 * 60 * 60 * 1000 }), 'INVALID_INPUT');
     expectError(await bad({ surveyId: 'twelve' }), 'INVALID_INPUT');
     expectError(await bad({ auth: undefined }), 'INVALID_INPUT');
+  });
+
+  it('INVALID_INPUT for emails that are malformed, oversized or could start a spreadsheet formula', async () => {
+    const bad = async (email: string) => call(async () => submitResponse(await submitBody(respondent, { email })));
+    for (const email of [
+      'a@b', 'a@@b.com', 'a b@c.com', 'a@b..com', '.a@b.com', 'a.@b.com', 'a@-b.com', 'a@b.c',
+      '=cmd@b.com', '+1@b.com', '-1@b.com', '@b.com', 'a\u0000@b.com', '<a>@b.com', 'ñ@b.com',
+      `${'a'.repeat(65)}@b.com`, `a@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(63)}.${'e'.repeat(63)}.com`,
+    ]) {
+      expectError(await bad(email), 'INVALID_INPUT');
+    }
+    for (const email of ['juan.delacruz@umak.edu.ph', 'j_d+survey%1@mail-server.example.org']) {
+      db.reset();
+      await register();
+      expect((await bad(email)).status).toBe(200);
+    }
+  });
+
+  it('INVALID_INPUT for oversized or unstorable answers and a signature that is not 65 bytes', async () => {
+    const bad = async (overrides: Record<string, unknown>) =>
+      call(async () => submitResponse(await submitBody(respondent, overrides)));
+    expectError(await bad({ answers: { ...answers, q8: 'x'.repeat(5001) } }), 'INVALID_INPUT');
+    expectError(await bad({ answers: { ...answers, q8: 'text\u0000' } }), 'INVALID_INPUT');
+    expectError(await bad({ answers: { ...answers, q1: 2.5 } }), 'INVALID_INPUT');
+    expectError(await bad({ answers: { ...answers, q1: [4] } }), 'INVALID_INPUT');
+    const many = Object.fromEntries(Array.from({ length: 31 }, (_, i) => [`k${i}`, 1]));
+    expectError(await bad({ answers: many }), 'INVALID_INPUT');
+    const p = await proof(respondent, 'submit', SURVEY_ID);
+    expectError(await bad({ auth: { ...p, signature: `0x${'ab'.repeat(5000)}` } }), 'INVALID_INPUT');
+    expectError(await bad({ auth: { ...p, timestamp: 1.5 } }), 'INVALID_INPUT');
+    expect(await db.listLogRecords(SURVEY_ID)).toEqual([]);
   });
 });
 
