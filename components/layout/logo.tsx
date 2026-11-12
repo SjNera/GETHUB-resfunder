@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { cn } from "@/lib/ui/cn";
 
-/** Two overlapping circles: responder + funder. */
+/** Segmented chain block; the rising arrow forms its top-right corner. Same paths as public/brand/*.svg. */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden className={cn("size-7", className)}>
-      <circle cx="12" cy="16" r="9" className="fill-fg" />
-      <circle cx="20" cy="16" r="9" className="fill-brand" style={{ mixBlendMode: "normal" }} />
-      <path d="M16 7.94a9 9 0 0 1 0 16.12a9 9 0 0 1 0-16.12Z" className="fill-brand-ink dark:fill-[#b35a00]" />
+    <svg viewBox="0 0 64 64" aria-hidden className={cn("size-7", className)}>
+      <g fill="none" strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round">
+        <path
+          className="stroke-fg"
+          d="M23.8 9.7 L32 5 L40.2 9.7 M55.4 36.1 L55.4 45.5 L47.2 50.3 M40.2 54.3 L32 59 L23.8 54.3 M16.8 50.3 L8.6 45.5 L8.6 36.1 M8.6 27.9 L8.6 18.5 L16.8 13.8"
+        />
+        <path className="stroke-brand" d="M15 41 L24 32 L31 38 L55.4 18.5 M47.2 13.8 L55.4 18.5 L55.4 27.9" />
+      </g>
     </svg>
   );
 }
