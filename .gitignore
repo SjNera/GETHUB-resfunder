@@ -18,6 +18,7 @@ contracts/typechain-types/
 contracts/coverage/
 contracts/coverage.json
 contracts/ignition/deployments/chain-31337/
+contracts/deployments/localhost.json
 
 # misc
 .DS_Store
