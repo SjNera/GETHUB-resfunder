@@ -22,7 +22,7 @@ export function SiteHeader() {
         <div className="material mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full pl-5 pr-2.5">
           <Logo />
           <nav aria-label="Site" className="mx-auto hidden items-center gap-1 md:flex">
-            {links.map((l) => (
+            {[...links, ...(signedIn ? [{ href: "/surveys/sleep/queue", label: "My surveys" }] : [])].map((l) => (
               <Link key={l.href} href={l.href} className="on-glass rounded-full px-3 py-2 text-[15px] !font-normal text-muted hover:text-fg">
                 {l.label}
               </Link>
@@ -56,7 +56,7 @@ export function SiteHeader() {
         </div>
         {open ? (
           <nav id="mobile-nav" aria-label="Site" className="material pop mx-auto mt-2 flex max-w-6xl flex-col rounded-3xl p-2 md:hidden">
-            {[{ href: "/", label: "Home" }, ...links, signedIn ? { href: "/account", label: "Your details" } : { href: "/sign-in", label: "Sign in" }].map((l) => (
+            {[{ href: "/", label: "Home" }, ...links, ...(signedIn ? [{ href: "/surveys/sleep/queue", label: "My surveys" }] : []), signedIn ? { href: "/account", label: "Your details" } : { href: "/sign-in", label: "Sign in" }].map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="on-glass rounded-2xl px-4 py-3 text-base hover:bg-surface-2">
                 {l.label}
               </Link>

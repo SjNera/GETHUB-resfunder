@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, ClipboardList, GraduationCap, Mail } from "lucide-react";
+import { ArrowLeft, ClipboardList, GraduationCap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { checkSchoolEmail } from "@/lib/auth/options";
@@ -36,26 +36,9 @@ import { WalletConnect } from "./wallet-step";
 
 type Stage = "email" | "code" | "role" | "setup" | "done";
 
-const RESEND_SECONDS = 30;
-const MAX_TRIES = 5;
-const LOCK_MS = 10 * 60_000;
-const CODE_TTL_MS = 10 * 60_000;
-
-function useNow(active: boolean) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [active]);
-  return now;
-}
-
 function safeNext(raw: string | null) {
   return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/account";
 }
-
-const sixDigits = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
 
 /** Where an existing account should land when it opens /sign-in. */
 function resumeStage(a: Account): Stage {
@@ -76,15 +59,9 @@ export function SignInFlow() {
     setStage(s);
   };
 
-  // Email + code
+  // Email
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [sent, setSent] = useState<{ email: string; domain: string; school: string; code: string; at: number } | null>(null);
-  const [codeInput, setCodeInput] = useState("");
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [tries, setTries] = useState(0);
-  const [lockedUntil, setLockedUntil] = useState(0);
-  const now = useNow(stage === "code");
 
   // Setup drafts
   const [role, setRole] = useState<Role | null>(null);
@@ -99,15 +76,13 @@ export function SignInFlow() {
   const current: Stage = stage ?? (account ? resumeStage(account) : "email");
 
   /* ---------------- email ---------------- */
-  const sendCode = (e?: React.FormEvent) => {
+  /** No 6-digit code: a valid school email signs in (the server checks the domain). */
+  const continueWithEmail = (e?: React.FormEvent) => {
     e?.preventDefault();
     const r = checkSchoolEmail(email);
     if (!r.ok) return setEmailError(r.error);
-    setSent({ email: r.email, domain: r.domain, school: r.school, code: sixDigits(), at: Date.now() });
-    setCodeInput("");
-    setCodeError(null);
-    setTries(0);
-    go("code");
+    const acc = signIn(r.email, r.domain, r.school);
+    go(resumeStage(acc));
   };
 
   if (current === "email") {
@@ -115,9 +90,9 @@ export function SignInFlow() {
       <Shell dir={dir} k="email">
         <Body
           title="Continue with your school email"
-          lead="One account for answering and publishing. We'll email you a link and a code."
+          lead="One account for answering and publishing. New here or coming back, start the same way."
         >
-          <form id="email-form" onSubmit={sendCode} noValidate>
+          <form id="email-form" onSubmit={continueWithEmail} noValidate>
             <FieldLabel htmlFor="email">School email</FieldLabel>
             <TextInput
               id="email"
@@ -143,89 +118,6 @@ export function SignInFlow() {
             Continue
           </Button>
           <p className="mt-3 text-center text-sm text-muted">Your email never goes on the blockchain.</p>
-        </Footer>
-      </Shell>
-    );
-  }
-
-  /* ---------------- code ---------------- */
-  if (current === "code" && sent) {
-    const locked = lockedUntil > now;
-    const wait = Math.max(0, RESEND_SECONDS - Math.floor((now - sent.at) / 1000));
-    const verify = (e?: React.FormEvent) => {
-      e?.preventDefault();
-      if (locked) return;
-      if (Date.now() - sent.at > CODE_TTL_MS) return setCodeError("That code has expired. We can send a new one.");
-      if (codeInput.trim() !== sent.code) {
-        const t = tries + 1;
-        setTries(t);
-        if (t >= MAX_TRIES) {
-          setLockedUntil(Date.now() + LOCK_MS);
-          return setCodeError("Too many tries. Try again in 10 minutes, or use the link.");
-        }
-        return setCodeError("That code doesn't match. Check the latest email.");
-      }
-      const acc = signIn(sent.email, sent.domain, sent.school);
-      go(resumeStage(acc));
-    };
-    return (
-      <Shell dir={dir} k="code">
-        <TopBar onBack={() => go("email", "back")} />
-        <Body
-          icon={<Mail />}
-          title="Check your email"
-          lead={
-            <>
-              We sent a link and a 6-digit code to <b className="text-fg">{sent.email}</b>. It expires in 10 minutes.
-            </>
-          }
-        >
-          <DemoNote>
-            Demo: no email is sent. Your code is <b className="font-mono text-fg">{sent.code}</b>.
-          </DemoNote>
-          <form id="code-form" onSubmit={verify} noValidate className="mt-6">
-            <FieldLabel htmlFor="code">6-digit code</FieldLabel>
-            <TextInput
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]*"
-              maxLength={6}
-              autoFocus
-              className="font-mono text-2xl tracking-[0.5em]"
-              value={codeInput}
-              onChange={(e) => {
-                setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6));
-                setCodeError(null);
-              }}
-              aria-invalid={!!codeError}
-            />
-            <FieldError>{codeError}</FieldError>
-            <Helper>Opened the link on another device? Enter the code here instead.</Helper>
-          </form>
-        </Body>
-        <Footer>
-          <Button type="submit" form="code-form" variant="primary" size="lg" className="w-full" disabled={codeInput.length !== 6 || locked}>
-            Verify
-          </Button>
-          <Button
-            variant="ghost"
-            className="mt-2 w-full text-muted"
-            disabled={wait > 0}
-            onClick={() => {
-              setSent({ ...sent, code: sixDigits(), at: Date.now() });
-              setCodeInput("");
-              setCodeError(null);
-            }}
-          >
-            {wait > 0 ? `Send again in 0:${String(wait).padStart(2, "0")}` : "Send again"}
-          </Button>
-          <p className="text-center text-sm text-muted">
-            Wrong email?{" "}
-            <button type="button" className="font-medium text-brand-ink [@media(hover:hover)_and_(pointer:fine)]:hover:underline" onClick={() => go("email", "back")}>
-              Change it
-            </button>
-          </p>
         </Footer>
       </Shell>
     );
@@ -485,10 +377,6 @@ function Footer({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
-}
-
-function DemoNote({ children }: { children: ReactNode }) {
-  return <p className="rounded-2xl bg-review-soft px-4 py-3 text-sm text-review">{children}</p>;
 }
 
 function RoleCard({ checked, onSelect, icon, title, children }: { checked: boolean; onSelect: () => void; icon: ReactNode; title: string; children: ReactNode }) {

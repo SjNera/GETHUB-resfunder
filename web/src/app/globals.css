@@ -8,9 +8,9 @@
  * changes everywhere.
  */
 :root {
-  --bg: #f2f1ee; /* Chalk White — the 60% */
+  --bg: #ffffff; /* white page (Chalk kept for surfaces) */
   --surface: #fafaf8;
-  --surface-2: #ebeae6;
+  --surface-2: #f2f1ee;
   --fg: #121212; /* Onyx Black — the 30% */
   --muted: #5f5f5c;
   --subtle: #8a8a86;
@@ -349,5 +349,13 @@ body:has(.auth-flow) .site-footer {
   from {
     opacity: 0;
     filter: blur(2px);
+  }
+}
+
+/* Toasts rise from the bottom edge and leave the same way. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(150%);
   }
 }

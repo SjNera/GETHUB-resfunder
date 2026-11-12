@@ -124,3 +124,13 @@ describe("text", () => {
     expect(plural(2, "response")).toBe("2 responses");
   });
 });
+
+describe("review queue demo seed", async () => {
+  const { RESPONSES } = await import("./review/seed");
+  it("every seeded response screens to Review under the real rule engine", () => {
+    for (const r of RESPONSES) expect(r.decision.result, r.id).toBe("review");
+  });
+  it("the AI disagreement case is marked as not agreed", () => {
+    expect(RESPONSES.find((r) => r.id === "r58")?.decision.ai?.agreed).toBe(false);
+  });
+});
