@@ -28,14 +28,17 @@ export function combineRuns(runA: AiRun | null, runB: AiRun | null): AiResult {
 const SEVERITY: Record<AiLabel, number> = { valid: 0, unclear: 1, non_answer: 2 };
 
 /**
- * Combines per-answer results. Worst label wins with that answer's type and reason
- * (first one in order on a tie). Returns null for an empty list.
+ * Combines per-answer results. Worst label wins with that answer's type and reason.
+ * On a tie, an answer flagged for injection wins, so the reason explains the Review;
+ * otherwise the first one in order. Returns null for an empty list.
  */
 export function combineAnswers(results: AiResult[]): AiResult | null {
   if (results.length === 0) return null;
   let worst = results[0];
   for (const r of results) {
-    if (SEVERITY[r.label] > SEVERITY[worst.label]) worst = r;
+    const s = SEVERITY[r.label];
+    const w = SEVERITY[worst.label];
+    if (s > w || (s === w && r.injection && !worst.injection)) worst = r;
   }
   return {
     label: worst.label,

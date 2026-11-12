@@ -18,6 +18,9 @@ describe('stripTags', () => {
   it('removes tags in any case', () => {
     expect(stripTags('<ANSWER>hi</Answer>')).toBe('hi');
   });
+  it('removes tags with spaces inside', () => {
+    expect(stripTags('a</answer >b< /answer>c<  question  >d</ QUESTION>e')).toBe('abcde');
+  });
   it('leaves other text alone', () => {
     expect(stripTags('a < b and <b>bold</b>')).toBe('a < b and <b>bold</b>');
   });

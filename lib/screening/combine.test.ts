@@ -51,4 +51,13 @@ describe('combineAnswers', () => {
   it('keeps the first answer on a label tie', () => {
     expect(combineAnswers([u, { ...u, reason: 'Second.' }])?.reason).toBe('Off topic.');
   });
+  it('on a label tie, takes the reason of the answer flagged for injection', () => {
+    const inj: AiResult = { ...v, injection: true, reason: 'Contains instructions for the screener.' };
+    expect(combineAnswers([v, inj])).toEqual(inj);
+    expect(combineAnswers([inj, v])).toEqual(inj);
+  });
+  it('a worse label still beats an injection on a better label', () => {
+    const inj: AiResult = { ...v, injection: true, reason: 'Contains instructions.' };
+    expect(combineAnswers([inj, n])).toEqual({ ...n, injection: true });
+  });
 });
