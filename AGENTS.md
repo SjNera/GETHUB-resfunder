@@ -34,6 +34,8 @@ ResFunder lets a student researcher lock a survey budget in a smart contract on 
 - Solidity with Hardhat in a separate `contracts/` package. OpenZeppelin `ReentrancyGuard`.
 - Neon Postgres, plain SQL. No ORM.
 - Groq SDK for the AI label. Zod for validation.
+- UI: Tailwind CSS 4, Base UI, lucide-react, next-themes, three.js (react-three-fiber, drei). ESLint with `eslint-config-next`.
+- One package manager: npm (root and `contracts/`). TypeScript 5.
 - No new dependencies beyond these without asking.
 
 ## 4. Structure and ownership
@@ -48,6 +50,8 @@ resfunder/
 ├── lib/
 │   ├── types.ts               FROZEN
 │   ├── canonical.ts           FROZEN
+│   ├── survey-schema.ts       Lane C   (surveySchema, validateAnswers; shared by UI and server)
+│   ├── ui/                    UI       (browser helpers: cn, format, fees, links, wallet, survey-tabs)
 │   ├── chain/                 Lane A   (abi.ts, client.ts, fee.ts, escrow.ts)
 │   ├── screening/             Lane B   (checks.ts, llm.ts, prompt.ts, rules.ts, index.ts)
 │   ├── db/                    Lane C   (schema.sql FROZEN, client.ts, queries.ts)
@@ -56,15 +60,18 @@ resfunder/
 ├── app/api/                   Lane C   (except app/api/fee, Lane A)
 ├── app/ (pages), components/  UI
 ├── data/                      demo-survey.json (C), labeled-set.json (B)
-└── scripts/                   eval.ts (B), e2e.ts (C)
+├── scripts/                   eval.ts (B), e2e.ts (C)
+└── site/                      standalone static demo page, not part of the app
 ```
+
+There is one Next.js app, at the repo root. Do not add another app folder. UI code never re-implements types, hashing, validation or screening: import `lib/types.ts`, `lib/canonical.ts` and `lib/survey-schema.ts`.
 
 | Lane | Dev | Owns |
 |---|---|---|
 | A, chain | Dev 1 | `contracts/`, `lib/chain/`, `app/api/fee/` |
 | B, screening | Dev 3 | `lib/screening/`, `data/labeled-set.json`, `scripts/eval.ts` |
-| C, plumbing | Dev 2 | `lib/db/`, `lib/auth/`, `lib/payment/`, `app/api/`, `scripts/e2e.ts`, `data/demo-survey.json` |
-| UI | Dev 3 | pages, `components/` |
+| C, plumbing | Dev 2 | `lib/db/`, `lib/auth/`, `lib/payment/`, `lib/survey-schema.ts`, `app/api/`, `scripts/e2e.ts`, `data/demo-survey.json` |
+| UI | Dev 3 | pages, `components/`, `lib/ui/`, `app/globals.css` |
 
 ## 5. Interfaces between lanes
 
@@ -161,7 +168,7 @@ SYNC -> READ -> BUILD -> CHECK -> GUARD -> COMMIT -> PUSH -> (task done?) MERGE 
 | C, plumbing | `npm run check` | Route shapes match TDD 7; C6 `scripts/e2e.ts --stubs` passes |
 | UI | `npm run check` and `npm run build` | The U-task check with a wallet on BSC testnet |
 
-`npm run check` = `tsc --noEmit` + `vitest run`.
+`npm run check` = `next typegen` + `tsc --noEmit` + `vitest run`. UI commits also run `npm run lint`.
 
 ### 8.3 Frozen file changes
 

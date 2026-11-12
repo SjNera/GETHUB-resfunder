@@ -37,7 +37,6 @@
   ],
   "exclude": [
     "node_modules",
-    "web",
     "site",
     "contracts"
   ]

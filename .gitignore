@@ -22,4 +22,7 @@ contracts/ignition/deployments/chain-31337/
 # misc
 .DS_Store
 *.log
+*.pem
+coverage/
+build/
 .vercel
