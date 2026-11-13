@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <TestnetBanner />
           <SiteHeader />
           <main className="flex-1">{children}</main>
-          <SiteFooter />
+          <Suspense fallback={null}>
+            <SiteFooter />
+          </Suspense>
         </Providers>
       </body>
     </html>

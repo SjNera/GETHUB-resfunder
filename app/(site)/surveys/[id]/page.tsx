@@ -1,6 +1,15 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-export default async function Page({ params }: PageProps<"/surveys/[id]">) {
+async function Go({ params }: Pick<PageProps<"/surveys/[id]">, "params">): Promise<never> {
   const { id } = await params;
-  redirect(`/surveys/${encodeURIComponent(id)}/overview`);
+  return redirect(`/surveys/${encodeURIComponent(id)}/overview`);
+}
+
+export default function Page({ params }: PageProps<"/surveys/[id]">) {
+  return (
+    <Suspense fallback={null}>
+      <Go params={params} />
+    </Suspense>
+  );
 }
