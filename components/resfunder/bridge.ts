@@ -3,6 +3,7 @@
 // What the dashboard engine (engine.js) may ask the real app to do: session, wallet, API calls.
 // The engine renders; everything that talks to the server, MetaMask or the chain goes through here.
 // Money is computed in wei (bigint) and handed to the engine as display strings.
+import qrcode from "qrcode-generator";
 import { getAddress, type Address } from "viem";
 import type { AppealItem, SurveyDetails } from "@/lib/api/shapes";
 import { ESCROW_ADDRESS } from "@/lib/chain/abi";
@@ -163,6 +164,13 @@ export function createBridge() {
 
   return {
     text,
+    /** A QR code (SVG markup) for a link. The markup comes from the library, never from user text. */
+    qrSvg(link: string): string {
+      const qr = qrcode(0, "M");
+      qr.addData(link);
+      qr.make();
+      return qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+    },
     rejectReasons: Object.entries(REJECT_REASONS) as [string, string][],
     appealChars: { min: APPEAL_MIN_CHARS, max: APPEAL_MAX_CHARS },
     contract: ESCROW_ADDRESS ? shortHash(ESCROW_ADDRESS) : "",

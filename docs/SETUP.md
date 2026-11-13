@@ -20,6 +20,7 @@ Set `BETTER_AUTH_URL` to the address the browser uses (`http://localhost:3000` i
 ```bash
 npm run db:apply        # surveys, responses, decisions (lib/db/schema.sql)
 npm run db:apply:auth   # Better Auth tables (lib/db/auth-schema.sql)
+npm run db:apply:app    # appeals and profiles (lib/db/app-schema.sql)
 npm run auth:smoke      # nonce -> SIWE signature -> session -> sign-out, with a throwaway key
 npm run db:smoke        # one row per table
 ```
@@ -66,13 +67,20 @@ npm run e2e                # full run: deployed contract, real screening
 
 ## Known limits
 
-- Email is a label. It is not verified yet (deferred, see AGENTS.md section 9).
+- Email is a label. It is not verified, and nothing in the app sends email (there is no email service or dependency).
 - Better Auth stores wallet addresses checksummed. Application tables store them lowercase.
-- Review actions, pause (R10) and CSV export (R11) are not built.
+- A review is never paid or rejected by itself. Undecided reviews stay unpaid until the researcher decides (no 24-hour auto-pay).
+- Review decisions and appeals use the sign-in session plus the survey's researcher wallet. The per-action signature (`AuthAction`)
+  has no "decide" action, and `lib/types.ts` is frozen. Adding one needs all three devs.
+- A rejection of a response in review is saved off chain. The contract allows one decision per respondent, so recording
+  "Don't pay" on chain would make an appeal impossible to pay. Code-confirmed blocks (empty, gibberish, duplicate) are on chain and can't be appealed.
+- The log route (R8) still returns each respondent's email to the researcher. The dashboard doesn't show it.
+- Sign-up answers are saved on the server (profiles table) but researchers don't see them yet.
+- CSV export (R11) is not built on the server. The dashboard exports the decision log in the browser.
 - Checked live on 2026-11-13: `db:smoke`, `auth:smoke`, `screen()` against Groq, `npm run eval`, and read-only
-  `lib/chain` calls against the deployment above. No decision or close has been sent on testnet yet.
+  `lib/chain` calls against the deployment above. Funding, paying, review decisions and close still need a manual run with MetaMask.
 - `GROQ_MODEL`: `llama-3.3-70b-versatile` is no longer served (404 `model_not_found`), and every response went to
   Review. Use `openai/gpt-oss-120b`. Eval: 0/20 genuine flagged, 18/20 junk caught, 3/3 injection caught.
-- Only a code check can block payment. To see "Not paid" in a manual run, give an open-ended answer with no
+- Only a code check can block payment on its own. To see "Not paid" in a manual run, give an open-ended answer with no
   vowels (`xkcd bdfg hjkl`), one repeated character (`zzzzzz`), or the exact text of an earlier response.
-  Keyboard mash with vowels (`asdf qwerty`) goes to Review.
+  Keyboard mash with vowels (`asdf qwerty`) goes to Review, where the researcher decides.

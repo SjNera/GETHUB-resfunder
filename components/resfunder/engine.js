@@ -45,9 +45,6 @@ const SV=id=>SURVEYS.find(s=>s.id===id);
 const TYPES=[['mc','Multiple choice'],['scale','Scale (1 to 5)'],['open','Open-ended']];
 const drafts=()=>SURVEYS.filter(s=>s.status==='draft');
 const saveDrafts=()=>{try{B.saveDrafts(drafts())}catch(e){}};
-/* A screen without a server route yet keeps its design and says so. */
-const note=(b,t)=>`<p class="sample">${I.eye}<span><b>${b}</b> ${t}</span></p>`;
-const soon=()=>'<span class="pill p-draft">Not connected yet</span>';
 const me=()=>{const email=S.auth.email||'',name=email.split('@')[0].split(/[._-]+/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||'You';
   return {email,name,first:name.split(' ')[0],ini:name.split(' ').map(w=>w[0]).join('').slice(0,2)}};
 
@@ -426,13 +423,13 @@ function sSettings(s,w){const live=s.status==='live',m=w.log.sum;
       <div class="srow"><span><b>Pause new answers</b><small>Stops new submissions until you turn it back on. Answers already sent are still checked and paid.</small></span><label class="switch"><input type="checkbox" data-pause="${s.id}" ${s.paused?'checked':''} ${live&&!S.busy?'':'disabled'} aria-label="Pause new answers"><span></span></label></div>
       <div class="srow"><span><b>Close survey and refund</b><small>${live?'Stops new responses and returns the unused budget to your wallet.':'This survey is closed.'+(m.refunded?' '+m.refunded+' came back to your wallet.':'')}</small></span>${live?`<button class="btn red" data-act="askClose">${I.refund}Close survey</button>`:''}</div></section></div>`}
 function appealModal(){const A=S.apl,h=(D.hist?D.hist.rows:[]).find(x=>x.key===A.key)||{title:'',why:''};
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Appeal"><div class="scr" data-act="apCancel"></div><div class="mm"><div class="hd">${I.send}Appeal this decision</div>
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Appeal"><div class="scr" data-act="apCancel"></div><div class="mm"><div class="hd"><span class="fx">${I.send}</span>Appeal this decision</div>
     <div class="bd"><p class="muted" style="margin:0 0 12px"><b>${esc(h.title)}</b><br>${esc(h.why)}</p><div class="fld"><label for="apT">Why should your answer count?</label><textarea class="inp" id="apT" data-apt="1" rows="5" maxlength="300" ${A.busy?'disabled':''}>${esc(A.text)}</textarea><div class="cnt2" id="apCnt">${A.text.length} / 300</div></div>
       <p class="hint" style="margin:8px 0 0">You can appeal once. The researcher's decision on an appeal is final.</p><div class="err" id="apErr" role="alert">${esc(A.err)}</div></div>
     <div class="ft"><button class="btn" data-act="apCancel" ${A.busy?'disabled':''}>Cancel</button><button class="btn dark" data-act="apSend" ${A.busy?'disabled aria-busy="true"':''}>${A.busy?'Sending…':'Send appeal'}</button></div></div></div>`}
 function closeModal(){const w=W(S.sid),m=w.log.sum,busy=S.busy;
   const lbl={confirm:'Confirm in MetaMask…',mining:'Waiting for the network…',registering:'Recording the refund…'}[busy]||'Close and refund';
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Close survey"><div class="scr" data-act="cancelClose"></div><div class="mm"><div class="hd">${I.refund}Close this survey?</div>
+  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Close survey"><div class="scr" data-act="cancelClose"></div><div class="mm"><div class="hd"><span class="fx">${I.refund}</span>Close this survey?</div>
     <div class="bd"><p class="muted" style="margin:0 0 12px">New responses stop right away. The contract returns the unused budget to you:</p><div class="amt">${m.remaining}</div><dl class="kv"><dt>To</dt><dd class="mono">${shortW(S.wallet)}</dd><dt>Fee</dt><dd>Not refunded</dd></dl>
       ${m.review?`<p class="hint" style="margin:10px 0 0">${m.review} response${m.review===1?' in review stays':'s in review stay'} unpaid.</p>`:''}<div class="err" role="alert">${esc(S.closeErr)}</div></div>
     <div class="ft"><button class="btn" data-act="cancelClose" ${busy?'disabled':''}>Keep open</button><button class="btn dark" data-act="doClose" ${busy?'disabled aria-busy="true"':''}>${lbl}</button></div></div></div>`}
@@ -465,16 +462,13 @@ function vFund(s){const Q=B.quote(s,fundIn(s)),busy=FUNDL[S.busy]?S.busy:'',dis=
       <div class="tot"><span style="font-weight:600">You deposit</span><b id="sD">${Q.deposit}</b></div><p class="hint" style="margin:8px 0 0">Paid in tBNB from ${S.wallet?shortW(S.wallet):'your wallet'}. The fee isn't refundable; unused budget is.</p>
       <button class="fundbtn" data-act="fund" ${busy?'disabled aria-busy="true"':''}><span class="fx">${fx}</span><span id="fundLbl">${busy?FUNDL[busy]:'Fund survey'+(Q.ok?' '+Q.deposit:'')}</span></button>
       <p class="fundnote">Opens MetaMask to approve and lock the budget in one step.</p></aside></div>`}
-function qrCells(){let h='';const fin=(r,c)=>{const inF=(a,b)=>r>=a&&r<a+7&&c>=b&&c<b+7,loc=(a,b)=>{const x=r-a,y=c-b;return x===0||x===6||y===0||y===6||(x>=2&&x<=4&&y>=2&&y<=4)};if(inF(0,0))return loc(0,0);if(inF(0,14))return loc(0,14);if(inF(14,0))return loc(14,0);return null};
-  for(let r=0;r<21;r++)for(let c=0;c<21;c++){const f=fin(r,c);h+=`<i class="${(f!==null?f:((r*7+c*13+r*c)%5<2))?'b':''}"></i>`}return h}
-const shareLink=id=>(S.launched[id]&&S.launched[id].link)||`${location.origin}/s/${id}`;
 function vLiveShare(s){const F=S.launched[s.id];
   return `<div class="lockbar">${I.lock}<span><b>Budget locked · ${F.deposit} in the contract</b><br><span style="font-size:13.5px">${F.budget} for answers and ${F.fee} fee. Your survey is live.</span></span><a class="mono" href="${F.txUrl}" target="_blank" rel="noopener">Tx ${F.tx}</a></div>
   <div class="lockrow"><div>${I.lock}Rate<b>${s.rate} per answer</b></div><div>${I.lock}Quota<b>${s.quota} responses</b></div><div>${I.lock}Deadline<b>${s.closesFull}</b></div><div>${I.lock}Questions<b>${s.q.length} locked</b></div></div>
   <div class="share"><section class="card pad"><h2 class="h">Share the link</h2><p class="muted" style="margin:0">Respondents open it, sign in with their email and wallet, then answer.</p>
       <div class="linkbox"><input class="inp" id="shareLink" readonly value="${esc(F.link)}" aria-label="Share link"><button class="btn dark" data-act="copyLink">${I.link}Copy</button></div>
       <div class="row" style="margin-top:20px"><button class="btn" data-act="studentView">${I.eye}Preview as a respondent</button><button class="btn dark pill" data-act="toOverview">Go to overview ${I.arrow}</button></div></section>
-    <section class="card pad" style="text-align:center"><h2 class="h">QR code for printing</h2><div class="qr" aria-label="Sample QR code">${qrCells()}</div><p class="hint" style="margin:0 0 12px">${soon()} Sample pattern. A real QR code isn't generated yet, so share the link.</p></section></div>`}
+    <section class="card pad" style="text-align:center"><h2 class="h">QR code for printing</h2><div class="qrimg" role="img" aria-label="QR code for the survey link">${B.qrSvg(F.link)}</div><p class="hint" style="margin:0 0 12px">Scan it to open the survey. Print it or share it as an image.</p><button class="btn" data-act="qrDownload">${I.dl}Download QR code</button></section></div>`}
 
 /* ================= finance / results / settings / help ================= */
 const RESPILL={pay:['paid','Paid'],review:['pending','In review'],no:['notpaid','Not paid'],pending:['pending','Checking']};
@@ -579,10 +573,7 @@ function vSettings(){const M=me();
   return header('','Settings','')+`<div class="g2"><section class="card pad"><h2 class="h">Account</h2><p class="muted" style="margin:0 0 16px">You can publish surveys as a researcher and answer other groups' surveys as a respondent.</p>
       <dl class="kv"><dt>Name</dt><dd>${esc(M.name)}</dd><dt>Email</dt><dd>${esc(M.email)}</dd><dt>Wallet</dt><dd class="mono">${S.wallet?shortW(S.wallet):'—'}</dd><dt>Network</dt><dd>BSC Testnet</dd></dl>
       <div class="srow" style="margin-top:16px;border-top:1px solid var(--line)"><span><b>Sign out</b><small>${esc(M.email)}</small></span><button class="btn" data-act="signOut" ${S.busy==='out'?'disabled':''}>Sign out</button></div></section>
-    <section class="card pad"><h2 class="h">Notifications ${soon()}</h2>
-      <div class="srow"><span><b>New response to review</b><small>Email me when the checks send a response to the review queue.</small></span><label class="switch"><input type="checkbox" disabled aria-label="New response to review, not connected yet"><span></span></label></div>
-      <div class="srow"><span><b>Budget running low</b><small>When the budget left can't cover the rest of the quota.</small></span><label class="switch"><input type="checkbox" disabled aria-label="Budget running low, not connected yet"><span></span></label></div>
-      <div class="srow"><span><b>New surveys to answer</b><small>When another group opens a paid survey you can answer.</small></span><label class="switch"><input type="checkbox" disabled aria-label="New surveys to answer, not connected yet"><span></span></label></div></section></div>`}
+    <section class="card pad"><h2 class="h">Email</h2><p class="muted" style="margin:0 0 12px">ResFunder doesn't send email. Your email is a label on your account, and it isn't verified. Results, reviews and appeals are in this dashboard.</p></section></div>`}
 function vHelp(){const f=[['How does screening decide who gets paid?','Code checks run first (empty, gibberish, duplicate, too fast, same option repeated). Then the AI labels each written answer twice. Published rules decide: Pay, Review or Don\'t pay. The AI can only send a response to Review; it can\'t block payment.'],
   ['What happens to a response in review?','It stays unpaid and shows in the survey\'s review queue with the reason. You pay it, or reject it with a reason. Nothing is paid or rejected by itself.'],['Can a respondent appeal?','Yes, once, after you reject a response in review. You decide the appeal and that decision is final. An answer blocked by a code check, like an empty answer, is already on chain and can\'t be appealed.'],
   ['What does the fee cover?','A flat fee per response ('+D.fee+') covers the network cost of each payment decision and running the screening. It isn\'t refunded when you close a survey; unused budget is.'],['Is this real money?','No. ResFunder runs on BSC Testnet with tBNB test tokens.']];
@@ -676,6 +667,8 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'newFund':newDraft();break;
     case 'delDraft':{const id=el.dataset.id,d=SV(id);if(!d||d.status!=='draft')break;const at=SURVEYS.indexOf(d);SURVEYS.splice(at,1);saveDrafts();render();
       toast('Draft deleted',()=>{SURVEYS.splice(Math.min(at,SURVEYS.length),0,d);saveDrafts();render();toast('Draft restored')});break;}
+    case 'qrDownload':{const F=S.launched[S.sid];if(!F)break;const url=URL.createObjectURL(new Blob([B.qrSvg(F.link)],{type:'image/svg+xml'})),a=document.createElement('a');
+      a.href=url;a.download=`${(SV(S.sid)||{}).code||'survey'}-qr.svg`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);break;}
     case 'copyLink':copy(shareLink(S.sid),'Share link copied');break;
     case 'copyAddr':copy(S.wallet,'Address copied');break;
     case 'copyW':copy(el.dataset.w,'Wallet copied');break;
