@@ -11,8 +11,8 @@ import { api, ApiClientError } from "@/lib/ui/api-client";
 import { authClient, signInWithWallet } from "@/lib/ui/auth/client";
 import { getProvider } from "@/lib/ui/auth/metamask";
 import {
-  bnb, chart, draftToSurvey, logView, results, surveyCode, surveyView, toAnswerDraft, toEngineQuestions, total,
-  type Chart, type EngineAnswers, type EngineDraft, type EngineLog, type EngineLogRow, type EngineQuestion, type EngineSurvey, type QuestionResult, type Range,
+  bnb, chart, draftToSurvey, historyView, logView, openView, results, surveyCode, surveyView, toAnswerDraft, toEngineQuestions, total,
+  type Chart, type EngineAnswers, type EngineDraft, type EngineHistory, type EngineLog, type EngineOpen, type EngineLogRow, type EngineQuestion, type EngineSurvey, type QuestionResult, type Range,
 } from "@/lib/ui/dashboard";
 import { addressUrl, shortHash, txUrl } from "@/lib/ui/format";
 import { parseSurveyRef } from "@/lib/ui/join";
@@ -337,6 +337,18 @@ export function createBridge() {
     },
 
     // ---------- respondent ----------
+
+    /** Surveys that accept answers now, minus the ones you funded yourself. */
+    async openSurveys(): Promise<EngineOpen[]> {
+      const mine = sessionWallet();
+      const now = Date.now();
+      return (await api.open()).surveys.filter((o) => !mine || o.researcher !== mine.toLowerCase()).map((o) => openView(o, now));
+    },
+
+    /** Your own answers and what happened to each. Needs the sign-in session only: no signature. */
+    async history(): Promise<{ rows: EngineHistory[]; earned: string; paid: number }> {
+      return historyView((await api.myResponses()).responses, Date.now());
+    },
 
     /** A share link, "/s/7" or "7" → the survey to answer. */
     async lookup(ref: string): Promise<AnswerSurvey> {

@@ -19,6 +19,35 @@ export interface SurveySummary {
   createdAt: string;
 }
 
+/** One row of the public list of surveys that accept answers (GET /api/surveys/open). */
+export interface OpenSurvey {
+  surveyId: number;
+  title: string;
+  description: string;
+  questionCount: number;
+  rateWei: WeiString;
+  quota: number;
+  deadline: number;
+  slotsLeft: number;
+  /** Lowercase wallet of the researcher. It is public on chain too. */
+  researcher: string;
+  createdAt: string;
+}
+
+/** One of the signed-in wallet's own responses (GET /api/me/responses). */
+export interface HistoryItem {
+  responseId: string;
+  surveyId: number;
+  surveyTitle: string;
+  rateWei: WeiString;
+  submittedAt: string;
+  status: ResponseStatus;
+  result: DecisionResult | null;
+  reasons: string[];
+  txHash: Hex | null;
+  explorerUrl: string | null;
+}
+
 export interface SurveyDetails {
   surveyId: number;
   survey: SurveyJson;

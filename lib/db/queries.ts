@@ -118,6 +118,18 @@ export async function listSurveysByResearcher(wallet: string): Promise<SurveyRow
   return rows.map(mapSurvey);
 }
 
+/** Surveys that accept answers now: open, not paused, before the deadline, with a free slot. Newest first. */
+export async function listOpenSurveys(nowUnix: number, limit = 100): Promise<SurveyRow[]> {
+  const rows = await query<Raw>(
+    `SELECT * FROM (${SURVEY_SELECT}) s
+     WHERE s.status = 'open' AND NOT s.paused AND s.deadline_unix > $1::bigint AND s.active_count < s.quota
+     ORDER BY s.created_at DESC
+     LIMIT $2::int`,
+    [String(nowUnix), limit],
+  );
+  return rows.map(mapSurvey);
+}
+
 export async function setSurveyClosed(surveyId: number, refundedWei: bigint, closeTxHash: Hex): Promise<void> {
   await query(
     `UPDATE surveys SET status = 'closed', refunded_wei = $2::numeric, close_tx_hash = $3
@@ -228,6 +240,42 @@ export async function listPriorResponses(surveyId: number, responseId: string): 
     [String(surveyId), responseId],
   );
   return rows.map((r) => ({ answers: r.answers_json as Answers, durationMs: Math.round(toNum(r.duration_ms)) }));
+}
+
+/** One of a wallet's own responses, with its survey and decision. Newest first. */
+export interface HistoryRow {
+  response: ResponseRow;
+  surveyTitle: string;
+  rateWei: bigint;
+  decision: Pick<DecisionRow, 'result' | 'reasons' | 'status' | 'txHash'> | null;
+}
+
+export async function listResponsesByWallet(wallet: string, limit = 200): Promise<HistoryRow[]> {
+  const rows = await query<Raw>(
+    `SELECT r.*, s.questions_json AS survey_json, s.rate_wei, d.id AS decision_id, d.result, d.reasons,
+            d.status AS decision_status, d.tx_hash
+     FROM responses r
+     JOIN surveys s ON s.survey_id = r.survey_id
+     LEFT JOIN decisions d ON d.response_id = r.id
+     WHERE r.wallet = $1
+     ORDER BY r.submitted_at DESC, r.id
+     LIMIT $2::int`,
+    [wallet.toLowerCase(), limit],
+  );
+  return rows.map((r) => ({
+    response: mapResponse(r),
+    surveyTitle: (r.survey_json as SurveyJson).title,
+    rateWei: toBig(r.rate_wei),
+    decision:
+      r.decision_id == null
+        ? null
+        : {
+            result: r.result as DecisionResult,
+            reasons: r.reasons as string[],
+            status: r.decision_status as DecisionStatus,
+            txHash: toHexOrNull(r.tx_hash),
+          },
+  }));
 }
 
 // ---------- Decisions ----------

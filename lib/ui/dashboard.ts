@@ -1,7 +1,7 @@
 // Pure mapping between the API shapes and the plain objects the dashboard engine
 // (components/resfunder/engine.js) renders. Money stays in wei here and reaches the
 // engine only as display strings.
-import type { LogResponse, LogRow, SurveySummary } from "@/lib/api/shapes";
+import type { HistoryItem, LogResponse, LogRow, OpenSurvey, SurveySummary } from "@/lib/api/shapes";
 import type { Question, ResponseStatus, SurveyJson } from "@/lib/types";
 import { refundAmount } from "./fees";
 import { formatBnb, formatDuration, formatWhen, shortHash, txUrl } from "./format";
@@ -134,6 +134,87 @@ export function surveyView(s: SurveySummary, now: number): EngineSurvey {
 /** Total of one wei field across surveys, as a display string. */
 export function total(list: readonly Pick<EngineSurvey, "paidOutWei" | "unusedWei">[], key: "paidOut" | "unused"): string {
   return bnb(list.reduce((a, s) => a + BigInt(key === "paidOut" ? s.paidOutWei : s.unusedWei), BigInt(0)));
+}
+
+// ---------- surveys open for answers ----------
+
+export type EngineOpen = {
+  id: string;
+  code: string;
+  title: string;
+  desc: string;
+  rate: string;
+  rateWei: string;
+  quota: number;
+  slotsLeft: number;
+  filled: number;
+  mins: number;
+  questions: number;
+  closes: string;
+  daysLeft: number;
+  researcher: string;
+};
+
+export function openView(o: OpenSurvey, now: number): EngineOpen {
+  const end = o.deadline * 1000;
+  return {
+    id: String(o.surveyId),
+    code: surveyCode(o.surveyId),
+    title: o.title,
+    desc: o.description,
+    rate: bnb(o.rateWei),
+    rateWei: o.rateWei,
+    quota: o.quota,
+    slotsLeft: o.slotsLeft,
+    filled: Math.round(((o.quota - o.slotsLeft) / o.quota) * 100),
+    mins: Math.max(1, Math.round(o.questionCount / 2)),
+    questions: o.questionCount,
+    closes: utcDay.format(new Date(end)),
+    daysLeft: Math.max(0, Math.ceil((end - now) / 86_400_000)),
+    researcher: o.researcher,
+  };
+}
+
+// ---------- my responses (as a respondent) ----------
+
+export type EngineHistory = {
+  key: string;
+  sid: string;
+  title: string;
+  code: string;
+  res: EngineRes;
+  amount: string;
+  why: string;
+  tx: string;
+  txUrl: string;
+  at: number;
+  when: string;
+};
+
+export function historyView(items: readonly HistoryItem[], now: number): { rows: EngineHistory[]; earned: string; paid: number } {
+  let earned = BigInt(0);
+  let paid = 0;
+  const rows = items.map((h): EngineHistory => {
+    const res = RES[h.status];
+    if (res === "pay") {
+      earned += BigInt(h.rateWei);
+      paid += 1;
+    }
+    return {
+      key: h.responseId,
+      sid: String(h.surveyId),
+      title: h.surveyTitle,
+      code: surveyCode(h.surveyId),
+      res,
+      amount: res === "pay" ? bnb(h.rateWei) : "0 tBNB",
+      why: h.reasons.length ? h.reasons.join(" ") : WHY[res],
+      tx: h.txHash ? shortHash(h.txHash) : "",
+      txUrl: h.txHash ? (h.explorerUrl ?? txUrl(h.txHash)) : "",
+      at: Date.parse(h.submittedAt),
+      when: formatWhen(h.submittedAt, now),
+    };
+  });
+  return { rows, earned: bnb(earned), paid };
 }
 
 // ---------- decision log ----------

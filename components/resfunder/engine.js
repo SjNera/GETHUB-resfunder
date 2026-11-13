@@ -32,7 +32,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const peso=n=>{const v=Math.round(n)*0.0001;return (v>=100?Math.round(v).toLocaleString('en-PH'):String(+v.toFixed(5)))+' tBNB'};
 /* B is the bridge to the real app (bridge.ts): session, MetaMask, API. D is what it has loaded so far. */
 const B=bridge;
-const D={fee:'…',bal:'',list:false,listErr:'',ws:{},wsErr:{},pend:null};
+const D={fee:'…',bal:'',list:false,listErr:'',ws:{},wsErr:{},pend:null,open:null,openErr:'',hist:null,histErr:''};
 const DEMO_WALLET='0x5d7e9a41c2b8f03e6d17a95b4c08e2f13ad6a03c';
 const shortW=w=>w.length>14?w.slice(0,6)+'…'+w.slice(-4):w;
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -48,31 +48,6 @@ const saveDrafts=()=>{try{B.saveDrafts(drafts())}catch(e){}};
 /* A screen without a server route yet keeps its design and says so. */
 const note=(b,t)=>`<p class="sample">${I.eye}<span><b>${b}</b> ${t}</span></p>`;
 const soon=()=>'<span class="pill p-draft">Not connected yet</span>';
-/* Sample surveys for the Answer page. Browsing other groups' surveys has no server route yet. */
-const OTHER=[
-  {id:'food',code:'SRV-000016',title:'Food spending of UMak students',group:'Thesis Group 3 · BS Nutrition',status:'live',resp:132,quota:200,rate:15,mins:3,deadline:'2026-11-20',closes:'Nov 20',
-    desc:'How much students spend on food each school day and what they usually eat on campus.',
-    q:[{t:'How much do you spend on food each school day?',type:'mc',req:true,opts:['Under ₱100','₱100–150','₱150–200','Over ₱200']},
-       {t:'What do you usually eat for lunch on campus?',type:'short',req:true},
-       {t:'What food would you like the canteen to sell?',type:'para',req:false}]},
-  {id:'online',code:'SRV-000018',title:'Online class fatigue',group:'Thesis Group 11 · BS Information Technology',status:'live',resp:41,quota:120,rate:10,mins:5,deadline:'2026-11-25',closes:'Nov 25',
-    desc:'How long online classes affect focus and energy during the week.',
-    q:[{t:'How many hours of online class do you have on a typical day?',type:'mc',req:true,opts:['None','1–2 hours','3–4 hours','5 or more hours']},
-       {t:'How often do you feel each of these after online class?',type:'grid',req:true,rows:['Tired eyes','Headache','Hard to focus','Sleepy'],cols:['Never','Rarely','Sometimes','Often']},
-       {t:'What helps you stay focused in online class?',type:'short',req:true}]},
-  {id:'jobs',code:'SRV-000011',title:'Part-time work and grades',group:'Thesis Group 5 · BS Accountancy',status:'live',resp:66,quota:80,rate:12,mins:4,deadline:'2026-11-14',closes:'Nov 14',
-    desc:'Whether working while studying changes study time and grades.',
-    q:[{t:'Do you work part-time while studying?',type:'mc',req:true,opts:['Yes, every week','Sometimes','No']},
-       {t:'What kind of work do you do, if any?',type:'short',req:true}]},
-  /* Not listed: reachable only by its link or QR code */
-  {id:'pets',code:'SRV-000021',title:'Pet ownership and stress',group:'Thesis Group 14 · BS Psychology',status:'live',resp:12,quota:60,rate:10,mins:2,deadline:'2026-11-28',closes:'Nov 28',hidden:true,
-    desc:'Whether having a pet at home relates to how stressed students feel during exams.',
-    q:[{t:'Do you have a pet at home?',type:'mc',req:true,opts:['Yes, a dog','Yes, a cat','Yes, another pet','No']},
-       {t:'How does your pet (or not having one) affect your stress during exams?',type:'short',req:true}]}];
-const ANY=id=>OTHER.find(s=>s.id===id);
-/* Sample payouts. Real results from this session are added on top. */
-const MYPAY=[{title:'Library use of first-year students',group:'Thesis Group 2 · BS Education',amt:10,st:'paid',tx:'0x4c1e…9a02',when:'Nov 9'},
-  {title:'Awareness of mental health apps',group:'Thesis Group 9 · BS Psychology',amt:12,st:'paid',tx:'0x8f02…11dd',when:'Nov 4'}];
 const me=()=>{const email=S.auth.email||'',name=email.split('@')[0].split(/[._-]+/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||'You';
   return {email,name,first:name.split(' ')[0],ini:name.split(' ').map(w=>w[0]).join('').slice(0,2)}};
 
@@ -100,6 +75,8 @@ async function loadWs(id,force){if(!force&&D.ws[id])return;delete D.wsErr[id];
   try{const w=await B.open(id);D.ws[id]=w;const i=SURVEYS.findIndex(s=>s.id===id);if(i>=0)SURVEYS[i]=w.survey;else SURVEYS.push(w.survey)}
   catch(e){D.wsErr[id]=B.text(e)}
   if((S.page==='survey'&&S.sid===id)||S.page==='dashboard')render()}
+function loadOpen(){D.openErr='';B.openSurveys().then(l=>{D.open=l;if(S.page==='answer')render()},e=>{D.openErr=B.text(e);if(S.page==='answer')render()})}
+function loadHist(){D.histErr='';B.history().then(h=>{D.hist=h;if(S.page==='answer'||S.page==='finance')render()},e=>{D.histErr=B.text(e);if(S.page==='answer'||S.page==='finance')render()})}
 function loadBalance(){B.balance().then(b=>{D.bal=b;if(S.page==='finance'&&S.finsub==='wallet')render()},()=>{})}
 function loadFee(){B.feeEach().then(f=>{D.fee=f;if(document.getElementById('sF'))refreshFund()},()=>{})}
 /* Signed in: show the dashboard and load what it needs. */
@@ -110,7 +87,7 @@ function enter(sess){S.boot=false;S.authed=true;S.landing=false;S.auth.email=ses
   else if(a==='answer'){S.page='answer';render()}
   else if(a&&a.s){S.page='answer';render();openByLink(a.s,'link')}
   else{S.want=(location.hash||'').slice(1);fromHash();render()}
-  loadList();loadFee();loadBalance()}
+  loadList();loadFee();loadBalance();loadOpen();loadHist()}
 
 /* ================= shell ================= */
 function sideNav(){
@@ -150,6 +127,8 @@ function nav(id){
   if(id.startsWith('finance-')){S.page='finance';S.finsub=id.slice(8);if(S.finsub==='wallet')loadBalance()}
   else if(id.startsWith('survey-')){const [,sid,tab]=id.split('-');if(SV(sid)){openSurvey(sid,tab);return}}
   else S.page=id;
+  if(S.page==='answer'){loadOpen();loadHist()}
+  if(S.page==='finance'&&S.finsub==='payouts')loadHist();
   render();try{window.scrollTo({top:0})}catch(e){}
 }
 const defTab=sid=>SV(sid).status==='draft'?'build':'overview';
@@ -482,57 +461,62 @@ function vLiveShare(s){const F=S.launched[s.id];
     <section class="card pad" style="text-align:center"><h2 class="h">QR code for printing</h2><div class="qr" aria-label="Sample QR code">${qrCells()}</div><p class="hint" style="margin:0 0 12px">${soon()} Sample pattern. A real QR code isn't generated yet, so share the link.</p></section></div>`}
 
 /* ================= finance / results / settings / help ================= */
-const earned=()=>MYPAY.filter(p=>p.st==='paid'&&!p.real).reduce((a,p)=>a+p.amt,0);
+const RESPILL={pay:['paid','Paid'],review:['pending','In review'],no:['notpaid','Not paid'],pending:['pending','Checking']};
+const histBlock=(none)=>D.histErr?`<div class="card empty"><h3>Couldn't load your answers</h3><p>${esc(D.histErr)}</p><button class="btn dark" data-act="reloadHist">Try again</button></div>`
+  :!D.hist?`<div class="card empty"><h3>Loading your answers</h3></div>`
+  :D.hist.rows.length?`<div class="tbox"><table class="t"><thead><tr><th>Survey</th><th>Amount</th><th>Status</th><th>Transaction</th><th>When</th></tr></thead><tbody>${D.hist.rows.map(p=>`<tr><td><div class="nm"><b style="font-weight:500">${esc(p.title)}</b><small>${p.code}</small></div></td><td>${p.amount}</td><td><span class="tp ${RESPILL[p.res][0]}">${RESPILL[p.res][1]}</span>${p.res==='no'||p.res==='review'?`<div class="hint" style="margin-top:4px">${esc(p.why)}</div>`:''}</td><td class="mono">${p.txUrl?`<a href="${p.txUrl}" target="_blank" rel="noopener">${p.tx}</a>`:'<span class="muted">—</span>'}</td><td class="muted">${p.when}</td></tr>`).join('')}</tbody></table></div><div class="tfoot"><span>${D.hist.rows.length} answer${D.hist.rows.length===1?'':'s'} · ${D.hist.earned} earned</span></div>`
+  :`<p class="muted sect-e">${none}</p>`;
 function vFinance(){const t=S.finsub,names={wallet:'Wallet',payouts:'Payouts',refunds:'Refunds'},role={wallet:'',payouts:'As a respondent',refunds:'As a researcher'};
   const tabs=`<div class="tabsrow"><div class="tabs fit" role="tablist" aria-label="Finance">${Object.entries(names).map(([v,l])=>`<button role="tab" data-nav="finance-${v}" aria-selected="${t===v}">${l}</button>`).join('')}</div>${role[t]?`<div class="meta">${role[t]}</div>`:''}</div>`;
   const closed=SURVEYS.filter(s=>s.real&&s.status==='closed');
   let body='';
-  if(t==='wallet'){const paidN=MYPAY.filter(x=>x.st==='paid'&&!x.real).length;
+  if(t==='wallet'){
     body=`<div class="g2"><section class="card pad wcard"><div class="row"><span class="kic">${fx}</span><span><b>MetaMask</b><br><span class="mono muted">${S.wallet?shortW(S.wallet):'—'}</span></span><span class="pill p-live" style="margin-left:auto">Connected</span></div>
         <div><div class="hint">Available</div><div class="bal">${D.bal||'…'}</div></div><dl class="kv"><dt>Network</dt><dd>BSC Testnet</dd><dt>Address</dt><dd class="mono">${S.wallet?shortW(S.wallet):'—'}</dd></dl>
         <div class="row"><button class="btn" data-act="copyAddr">${I.link}Copy address</button>${S.wallet?`<a class="btn ghost" href="${B.walletUrl(S.wallet)}" target="_blank" rel="noopener">View on BscScan</a>`:''}</div></section>
       <section class="card pad minc"><div><h2 class="h">Money in</h2><p class="muted" style="margin:0">What came back to this wallet, by role.</p></div>
-        <div class="mtiles"><div class="mtile"><span class="kic">${I.coins}</span><div><span class="hint">Payouts · as a respondent · sample</span><b>${peso(earned())}</b><small>${paidN} paid answer${paidN===1?'':'s'}</small></div></div>
+        <div class="mtiles"><div class="mtile"><span class="kic">${I.coins}</span><div><span class="hint">Payouts · as a respondent</span><b>${D.hist?D.hist.earned:'—'}</b><small>${D.hist?D.hist.paid+' paid answer'+(D.hist.paid===1?'':'s'):'Loading…'}</small></div></div>
           <div class="mtile"><span class="kic">${I.refund}</span><div><span class="hint">Refunds · as a researcher</span><b>${D.list?B.sum(closed,'unused'):'—'}</b><small>${closed.length} closed survey${closed.length===1?'':'s'}</small></div></div></div></section></div>`}
-  else if(t==='payouts'){const stl={paid:['paid','Paid'],review:['pending','In review'],no:['notpaid','Not paid']};
-    body=note('Sample data.',"Your payout history isn't connected yet. Surveys you answer in this session are added on top, with their real result.")+
-    `<p class="fintro">Money paid to you for answering other groups' surveys. <button class="btn ghost" style="padding:0;font-size:inherit;text-decoration:underline" data-nav="answer">Answer more surveys</button></p>
-    <div class="tbox"><table class="t"><thead><tr><th>Survey</th><th>Amount</th><th>Status</th><th>Transaction</th><th>When</th></tr></thead><tbody>${MYPAY.map(p=>`<tr class="${p.fresh?'new':''}"><td><div class="nm"><b style="font-weight:500">${esc(p.title)}</b><small class="p">${esc(p.group||'')}</small></div></td><td>${p.real?p.amtTxt:p.st==='no'?'0 tBNB':peso(p.amt)}</td><td><span class="tp ${stl[p.st][0]}">${stl[p.st][1]}</span></td><td class="mono">${p.txUrl?`<a href="${p.txUrl}" target="_blank" rel="noopener">${p.tx}</a>`:p.tx}</td><td class="muted">${p.when}</td></tr>`).join('')}</tbody></table></div>`}
+  else if(t==='payouts'){
+    body=`<p class="fintro">What happened to the surveys you answered, and any money sent to your wallet. <button class="btn ghost" style="padding:0;font-size:inherit;text-decoration:underline" data-nav="answer">Answer more surveys</button></p>${histBlock('You haven\'t answered a survey yet.')}`}
   else body=`<p class="fintro">Unused budget returned to you when your surveys closed. The flat fee per response isn't refunded.</p>
     ${closed.length?`<div class="tbox"><table class="t"><thead><tr><th>Survey</th><th>Paid responses</th><th>Paid out</th><th>Refunded</th><th class="act">Action</th></tr></thead><tbody>
     ${closed.map(s=>`<tr><td><div class="nm"><b style="font-weight:500">${esc(s.title)}</b><small>${s.code}</small></div></td><td>${s.paid} / ${s.quota}</td><td>${s.paidOut}</td><td>${s.unused}</td><td class="act"><button class="rvbtn view" data-nav="survey-${s.id}-settings">View</button></td></tr>`).join('')}</tbody></table></div>`
     :`<p class="muted sect-e">${D.list?'No refunds yet. Closing a survey returns its unused budget here.':'Loading your surveys…'}</p>`}`;
   return header('<span>Finance</span>',names[t],'')+tabs+body}
-/* Answer surveys: a signed-in user answers another group's survey as a respondent */
-function vAnswer(){const lbl={pay:['p-pay','Paid'],review:['p-rev','In review'],nopay:['p-no','Not paid']};
-  const list=OTHER.filter(s=>!s.hidden).sort((a,b)=>a.deadline.localeCompare(b.deadline));
-  const card=s=>{const a=S.answered[s.id],left=s.quota-s.resp,pct=Math.round(s.resp/s.quota*100);
-    return `<article class="card acard"><div class="acard-top"><span>${esc(s.group)}</span><span class="aclose">Closes ${s.closes}</span></div>
-      <h3 class="h">${esc(s.title)}</h3><p class="adesc">${esc(s.desc)}</p>
-      <ul class="ameta"><li>${I.coins}<span><b>${peso(s.rate)}</b> / answer</span></li><li>${I.clock}<span>${s.mins} min</span></li><li>${I.users}<span>${left} spots left</span></li></ul>
-      <div class="aprog"><span class="tr" role="progressbar" aria-label="Spots filled" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></span><span>${pct}% filled</span></div>
-      ${a?`<div class="adone">${I.check}Tried · <span class="pill ${lbl[a][0]}">${lbl[a][1]}</span></div>`:`<button class="btn" data-answer="${s.id}">Try this sample ${I.arrow}</button>`}</article>`};
-  const looking=S.busy==='lookup';
-  return header('<span>Pwede ka ring magsagot ng survey</span>','Answer surveys',`<button class="btn" data-nav="finance-payouts">See payouts ${I.arrow}</button>`)+
-  `<div class="kpis k3" style="margin-bottom:18px">${kpi(I.coins,peso(earned()),'sample','n','Earned as a respondent')}
-    ${kpi(I.check,MYPAY.length,'sample','n','Surveys answered')}
-    ${kpi(I.peso,list.length?peso(Math.max(...list.map(s=>s.rate))):'—','sample','n','Highest pay open')}</div>
+/* Answer surveys: every survey that accepts answers, or open one by its link */
+const answeredIds=()=>new Set((D.hist?D.hist.rows.map(r=>r.sid):[]).concat(Object.keys(S.answered)));
+function vAnswer(){const done=answeredIds(),looking=S.busy==='lookup';
+  const list=(D.open||[]).filter(o=>!SV(o.id)).sort((a,b)=>a.daysLeft-b.daysLeft);
+  const card=o=>{const a=done.has(o.id);
+    return `<article class="card acard"><div class="acard-top"><span>${o.code}</span><span class="aclose ${o.daysLeft<=3?'soon':''}">${o.daysLeft<=3?'Closing soon · ':'Closes '}${o.closes}</span></div>
+      <h3 class="h">${esc(o.title)}</h3><p class="adesc">${esc(o.desc||'')}</p>
+      <ul class="ameta"><li>${I.coins}<span><b>${o.rate}</b> / answer</span></li><li>${I.clock}<span>${o.mins} min</span></li><li>${I.users}<span>${o.slotsLeft} spot${o.slotsLeft===1?'':'s'} left</span></li></ul>
+      <div class="aprog"><span class="tr" role="progressbar" aria-label="Spots filled" aria-valuenow="${o.filled}" aria-valuemin="0" aria-valuemax="100"><span style="width:${o.filled}%"></span></span><span>${o.filled}% filled</span></div>
+      ${a?`<div class="adone">${I.check}You already answered this survey</div>`:`<button class="btn dark" data-answer="${o.id}" ${looking?'disabled':''}>Answer survey ${I.arrow}</button>`}</article>`};
+  const best=list.filter(o=>!done.has(o.id)).reduce((m,o)=>!m||BigInt(o.rateWei)>BigInt(m.rateWei)?o:m,null);
+  const listHtml=D.openErr?`<div class="card empty"><h3>Couldn't load the open surveys</h3><p>${esc(D.openErr)}</p><button class="btn dark" data-act="reloadOpen">Try again</button></div>`
+    :!D.open?`<div class="card empty"><h3>Loading open surveys</h3></div>`
+    :list.length?`<div class="acards">${list.map(card).join('')}</div>`:`<p class="muted sect-e">No other surveys are open right now. If you have a link, paste it above.</p>`;
+  return header('<span>Pwede ka ring magsagot ng survey</span>','Answer surveys',`<button class="btn" data-nav="finance-payouts">See your answers ${I.arrow}</button>`)+
+  `<div class="kpis k3" style="margin-bottom:18px">${kpi(I.coins,D.hist?D.hist.earned:'—','','','Earned as a respondent')}
+    ${kpi(I.check,D.hist?D.hist.rows.length:'—','','','Surveys answered')}
+    ${kpi(I.peso,best?best.rate:'—',best?'per answer':'','n','Highest pay open')}</div>
   <section class="card join" aria-labelledby="joinH"><div><h2 class="h" id="joinH">Have a link or QR code?</h2><p class="hint">Paste the link a researcher shared, or upload a photo or screenshot of its QR code.</p></div>
     <div class="join-r"><label class="jin" for="jLink">${I.link}<span class="vh">Survey link</span><input id="jLink" data-in="jLink" placeholder="Paste a survey link" value="${esc(S.jLink)}" autocomplete="off" spellcheck="false" ${looking?'disabled':''}></label>
       <button class="btn dark" data-act="openLink" ${looking?'disabled aria-busy="true"':''}>${looking?'Opening…':'Open'}</button><input class="vh" id="jQR" type="file" accept="image/*"><label class="btn upl" for="jQR" id="jQRLbl">${I.qr}Upload QR code</label></div>
     <div class="err" id="jErr" role="alert"></div></section>
-  <div class="sect-t"><h2 class="h">Open surveys <span class="sc">${list.length}</span></h2><span class="hint">Closing soonest first</span></div>
-  ${note('Sample data.',"Browsing other groups' surveys isn't connected yet. These examples only show how answering looks. To answer a real survey, open its link above.")}
-  <div class="acards">${list.map(card).join('')}</div>`}
+  <div class="sect-t"><h2 class="h">Open surveys <span class="sc">${D.open?list.length:0}</span></h2><span class="hint">Closing soonest first · Your own surveys aren't listed</span></div>
+  ${listHtml}`}
 /* Open a real survey from a pasted link, a survey number, or a decoded QR code */
 function openByLink(t,src){setErr('jErr','');
   if(!(t||'').trim())return setErr('jErr','Paste a survey link first.');
   if(S.busy)return;
   S.busy='lookup';render();
   B.lookup(t).then(s=>{S.busy='';
-      const mine=SV(s.id),done=S.answered[s.id];
+      const mine=SV(s.id),done=answeredIds().has(s.id);
       if(mine||done||!s.open){render();return setErr('jErr',mine?"That's one of your own surveys. You can't answer your own surveys.":done?'You already answered this survey. One payout per respondent.':s.why)}
-      S.jLink='';S.sv=Object.assign(newSV(s.id,true),{live:true,s,startedAt:Date.now()});render()},
+      S.jLink='';S.sv=Object.assign(newSV(s.id,true),{s,startedAt:Date.now()});render()},
     e=>{S.busy='';render();setErr('jErr',src==='qr'?"That QR code isn't a ResFunder survey link.":B.text(e))})}
 let jsqrP=null;
 const loadJsQR=()=>jsqrP||(jsqrP=new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';sc.onload=()=>window.jsQR?ok(window.jsQR):no();sc.onerror=()=>{jsqrP=null;no()};document.head.appendChild(sc)}));
@@ -590,18 +574,17 @@ function vHelp(){const f=[['How does screening decide who gets paid?','Code chec
 /* ================= student view (respondent phone) ================= */
 function phone(body,foot,back){return `<div class="phone"><div class="sbar3"><span>10:32</span><span>●●● ▮</span></div><div class="pban"><b>BSC Testnet</b> · test tokens only</div>
   <div class="pnav"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>${back?`<button class="btn ghost back" data-rgo="${back}">${I.back}Back</button>`:''}</div><div class="pbody">${body}</div>${foot?`<div class="pfoot">${foot}</div>`:''}</div>`}
-/* Three ways in: live (R.live, a real survey and a real submission), a sample card (R.real, nothing is sent),
-   and the researcher's preview of their own survey (neither flag). */
-function vStudent(){const R=S.sv,s=R.s||ANY(R.sid),Q=s.q;let ph='';
+/* Two ways in: live (a real survey and a real submission) and the researcher's preview of their own survey (nothing is sent). */
+function vStudent(){const R=S.sv,s=R.s,Q=s.q;let ph='';
   const step=R.step,rate=typeof s.rate==='string'?s.rate:s.rate!=null?peso(s.rate):(s.rateIn||'0')+' tBNB';
   const mins=s.mins||Math.max(1,Math.round(Q.length/2)),spots=s.slotsLeft!=null?s.slotsLeft:Math.max(0,(+s.quota||0)-(s.paid!=null?s.paid:s.resp||0)),closes=s.closesFull||fmtDate(s.deadline);
-  if(step==='intro')ph=phone(`<div class="intro"><div class="g">${esc(s.group||(s.code?s.code+' · ':'')+'Paid survey on BSC Testnet')}</div><h2>${esc(s.title||'Untitled survey')}</h2><p>${esc(s.desc||'')}</p><div class="s3"><div><b>${rate}</b><span>per valid answer</span></div><div><b>${mins}m</b><span>to complete</span></div><div><b>${spots}</b><span>paid spots left</span></div></div><div class="cl">Closes ${closes}</div></div>`,`<button class="btn dark block" data-rgo="${R.real?'consent':'verify'}">Start survey</button><span class="hint" style="text-align:center">${R.real?'Signed in as '+esc(me().email)+'.':'Respondents sign in with their email and wallet first.'}</span>`);
+  if(step==='intro')ph=phone(`<div class="intro"><div class="g">${esc(s.group||(s.code?s.code+' · ':'')+'Paid survey on BSC Testnet')}</div><h2>${esc(s.title||'Untitled survey')}</h2><p>${esc(s.desc||'')}</p><div class="s3"><div><b>${rate}</b><span>per valid answer</span></div><div><b>${mins}m</b><span>to complete</span></div><div><b>${spots}</b><span>paid spots left</span></div></div><div class="cl">Closes ${closes}</div></div>`,`<button class="btn dark block" data-rgo="${R.live?'consent':'verify'}">Start survey</button><span class="hint" style="text-align:center">${R.live?'Signed in as '+esc(me().email)+'.':'Respondents sign in with their email and wallet first.'}</span>`);
   else if(step==='verify'){
     if(R.verified)ph=phone(`<div class="res"><div class="icirc ic-ok">${I.check}</div><h2 class="ph1">Email verified</h2><p class="pp">${esc(R.email)} can be paid once for this survey.</p></div>`,`<button class="btn dark block" data-rgo="consent">Continue</button>`,'intro');
     else ph=phone(`<h2 class="ph1">Your email</h2><p class="pp">One payout per respondent. Researchers never see your email.</p><div class="fld"><label for="rEmail">Email</label><input class="inp" id="rEmail" data-rin="email" type="email" placeholder="example@email.com" value="${esc(R.email)}"><div class="err" id="rEmailErr"></div></div><button class="btn ghost" style="align-self:flex-start;padding:8px 0" data-ract="demoEmail">Use a demo email</button>`,`<button class="btn dark block" data-ract="sendCode">Continue</button>`,'intro');}
   else if(step==='consent'){const li=(ic,b,t)=>`<li><span class="ic">${ic}</span><span><b>${b}</b>${t}</span></li>`;
     ph=phone(`<h2 class="ph1">Before you start</h2><p class="pp">Please read this. It takes 20 seconds.</p><ul class="blist">${li(I.doc,`${Q.length} question${Q.length===1?'':'s'}, about ${mins} minute${mins===1?'':'s'}`,'Nothing is sent until you press Submit.')}${li(I.shield,'Anonymous','Researchers see your answers and wallet, never your email.')}${li(I.wallet,`${rate} for a valid answer`,'Checked by code and AI. Unclear ones go to a person.')}</ul>
-      <label class="chk"><input type="checkbox" data-ragree="1" ${R.agree?'checked':''}><span>I'm 18 or older and agree to take part in this study.</span></label><div class="err" id="rAgreeErr" style="margin-top:6px"></div>`,`<button class="btn dark block" data-ract="agree">I agree, start</button>`,R.real?'intro':'verify');}
+      <label class="chk"><input type="checkbox" data-ragree="1" ${R.agree?'checked':''}><span>I'm 18 or older and agree to take part in this study.</span></label><div class="err" id="rAgreeErr" style="margin-top:6px"></div>`,`<button class="btn dark block" data-ract="agree">I agree, start</button>`,R.live?'intro':'verify');}
   else if(step==='answer'){const i=R.qi,q=Q[i],a=R.ans[i];let inp='';
     if(q.type==='mc')inp=q.opts.map((o,j)=>`<label class="ropt"><input type="radio" name="ra${i}" data-rans="${i}" data-v="${j}" ${a===j?'checked':''}>${esc(o)}</label>`).join('');
     else if(q.type==='scale')inp=`<div class="gchips gscale" role="radiogroup" aria-label="Pick a number">${scaleVals(q).map(v=>`<label><input type="radio" name="ra${i}" data-rans="${i}" data-v="${v}" ${a===v?'checked':''}>${v}</label>`).join('')}</div>`;
@@ -633,21 +616,19 @@ function vStudent(){const R=S.sv,s=R.s||ANY(R.sid),Q=s.q;let ph='';
     else if(R.appeal==='form')ph=phone(`<h2 class="ph1">Appeal this decision</h2><p class="pp">Tell the researchers why your answer should count. You can appeal once.</p><div class="fld"><label for="rAp">Your reason</label><textarea class="inp" id="rAp" data-rin="appealText" rows="6" maxlength="300" placeholder="My answer was about…">${esc(R.appealText)}</textarea><div class="cnt2" id="rApCnt">${R.appealText.length} / 300</div><div class="err" id="rApErr"></div></div>`,`<button class="btn dark block" data-ract="sendAppeal">Send appeal</button><button class="btn ghost" data-ract="cancelAppeal">Cancel</button>`);
     else{const qi=Math.max(0,Q.findIndex(isText)),a=((R.ans[qi]||'')+'').trim()||'asdf';
       ph=phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Not paid</h2><p class="pp">Your answer to question ${qi+1} didn't pass a code check.</p><div class="rbox"><div class="hint">${esc(Q[qi].t)}</div><div class="quote" style="border-color:var(--line-2)">“${esc(a)}”</div></div><p class="hint" style="margin-top:12px">Appeals are planned. This sample shows how one would look.</p></div>`,`<button class="btn dark block" data-ract="openAppeal">Appeal</button><button class="btn ghost" data-ract="restart">Done</button>`);}}
-  const label=R.live?'Answering as a respondent · '+esc(me().email):R.real?'Sample survey · nothing is sent':'Preview · what respondents see · nothing is sent';
+  const label=R.live?'Answering as a respondent · '+esc(me().email):'Preview · what respondents see · nothing is sent';
   return `<div class="sv" role="dialog" aria-modal="true" aria-label="Respondent view"><div class="scr" data-act="closeSV"></div><div class="hdr">${I.eye.replace('<svg','<svg style="width:16px;height:16px"')}<span>${label}</span><button class="ibtn" data-act="closeSV" aria-label="Close respondent view">${I.x}</button></div>${ph}</div>`}
 let timers=[];const clearT=()=>{timers.forEach(clearTimeout);timers=[]};
 function runScreen(){clearT();const tick=()=>{if(!S.sv||S.sv.step!=='screen')return;S.sv.stage++;render();if(S.sv.stage<3)timers.push(setTimeout(tick,900));else timers.push(setTimeout(()=>{if(S.sv&&S.sv.step==='screen')rgo(S.sv.outcome)},900))};timers.push(setTimeout(tick,900))}
 function rgo(step){const R=S.sv;R.step=step;if(step==='screen'){R.stage=0;runScreen()}else clearT();if(step==='nopay'&&R.appeal!=='sent')R.appeal='idle';
-  if(R.real&&!R.live&&!R.logged&&(step==='pay'||step==='review'||step==='nopay')){R.logged=true;S.answered[R.sid]=step}
   render()}
 /* The real submission: one signature, the answers, then the server's screening and its decision. */
 function submitLive(){const R=S.sv;if(R.sending)return;R.sending=true;R.step='screen';R.err='';R.phase='sign';clearT();render();
   B.submit(R.sid,R.ans,R.startedAt,p=>{R.phase=p;if(S.sv===R)render()}).then(res=>{R.sending=false;R.res=res;S.answered[R.sid]=res.step;
-      MYPAY.unshift({real:true,title:R.s.title,group:R.s.code,amtTxt:res.step==='pay'?res.amount:'0 tBNB',st:{pay:'paid',review:'review',nopay:'no'}[res.step],tx:res.tx||'—',txUrl:res.txUrl,when:'Just now',fresh:true});
       if(S.sv===R){R.step=res.step;render()}else toast(res.step==='pay'?`${res.amount} sent to your wallet`:res.step==='review'?'Your answers are under review':'Your answers were not paid');
-      loadBalance()},
+      loadBalance();loadHist()},
     e=>{R.sending=false;R.err=B.text(e);if(S.sv===R)render();else toast(R.err)})}
-const newSV=(sid,real)=>({sid,real:!!real,live:false,s:null,step:'intro',email:real?me().email:'',verified:false,agree:false,qi:0,ans:{},wallet:real?S.wallet:'',stage:0,outcome:'pay',appeal:'idle',appealText:'',res:null,err:'',phase:''});
+const newSV=(sid,live)=>({sid,live:!!live,s:null,step:'intro',email:live?me().email:'',verified:false,agree:false,qi:0,ans:{},wallet:live?S.wallet:'',stage:0,outcome:'pay',appeal:'idle',appealText:'',res:null,err:'',phase:''});
 /* ================= actions ================= */
 let tt,lastUndo=null;
 function toast(m,undo){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;document.getElementById('toastUndo').hidden=!undo;lastUndo=undo||null;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4000)}
@@ -673,6 +654,8 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'sideClose':S.sideOpen=false;render();break;
     case 'toast':toast(el.dataset.msg);break;
     case 'reload':D.list=false;render();loadList(true);break;
+    case 'reloadOpen':D.open=null;render();loadOpen();break;
+    case 'reloadHist':D.hist=null;render();loadHist();break;
     case 'reopen':delete D.ws[S.sid];render();loadWs(S.sid,true);break;
     case 'newFund':newDraft();break;
     case 'delDraft':{const id=el.dataset.id,d=SV(id);if(!d||d.status!=='draft')break;const at=SURVEYS.indexOf(d);SURVEYS.splice(at,1);saveDrafts();render();
@@ -680,7 +663,7 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'copyLink':copy(shareLink(S.sid),'Share link copied');break;
     case 'copyAddr':copy(S.wallet,'Address copied');break;
     case 'copyW':copy(el.dataset.w,'Wallet copied');break;
-    case 'studentView':S.sv=Object.assign(newSV(S.sid,false),{s});render();break;
+    case 'studentView':S.sv=Object.assign(newSV(S.sid,false),{s:SV(S.sid)});render();break;
     case 'openLink':openByLink(S.jLink,'link');break;
     case 'closeSV':clearT();S.sv=null;render();break;
     case 'addOpt':{const q=s.q[+el.dataset.i];if(q.opts.length>=12)return toast('A question can have up to 12 options');q.opts.push('Option '+(q.opts.length+1));saveDrafts();render();break;}
@@ -708,7 +691,7 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'export':exportCsv(false);break;
     case 'exportPaid':exportCsv(true);break;
   }}
-function ract(a){const R=S.sv,Q=(R.s||ANY(R.sid)).q;
+function ract(a){const R=S.sv,Q=R.s.q;
   switch(a){
     case 'demoEmail':R.email='maria.santos@email.com';render();break;
     case 'sendCode':if(!emailOk(R.email))return setErr('rEmailErr','Enter a valid email, like example@email.com.');R.verified=true;rgo('consent');break;
@@ -724,7 +707,6 @@ function ract(a){const R=S.sv,Q=(R.s||ANY(R.sid)).q;
     case 'sendAppeal':if(R.appealText.trim().length<10)return setErr('rApErr','Write at least a short sentence (10 characters).');R.appeal='sent';render();break;
     case 'restart':clearT();
       if(R.live){const st=R.res&&R.res.step;S.sv=null;render();toast(st==='pay'?`${R.res.amount} sent to your wallet`:st==='review'?'Thanks. Your answers are under review.':'Thanks for answering');break}
-      if(R.real){S.sv=null;render();toast('Sample finished. Nothing was sent.');break}
       Object.assign(R,{step:'intro',email:'',verified:false,agree:false,qi:0,ans:{},wallet:'',stage:0,appeal:'idle',appealText:''});render();break;
   }}
 
@@ -738,7 +720,7 @@ document.addEventListener('click',e=>{
   if(d.nav){nav(d.nav);return}
   if(d.open){openSurvey(d.open);return}
   if(d.openrev){S.openRev=d.openrev;render();return}
-  if(d.answer){S.sv=newSV(d.answer,true);render();return}
+  if(d.answer){S.jLink='';openByLink(d.answer,'card');return}
   if(d.stab){S.stab=d.stab;S.fOpen=false;render();return}
   if(d.fsub){S.fsub=d.fsub;render();return}
   if(d.rv){S.rv=d.rv;render();return}

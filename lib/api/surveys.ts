@@ -7,6 +7,7 @@ import { readClosed, readSurveyCreated, type SurveyCreatedEvent } from '../chain
 import {
   getSurvey,
   insertSurvey,
+  listOpenSurveys,
   listSurveysByResearcher,
   setSurveyClosed,
   setSurveyPaused,
@@ -15,7 +16,7 @@ import {
 import { surveySchema } from '../survey-schema';
 import type { AuthProof, Hex, SurveyJson } from '../types';
 import { ApiFailure } from './errors';
-import type { ClosedResult, RegisterResult, SurveyDetails, SurveySummary } from './shapes';
+import type { ClosedResult, OpenSurvey, RegisterResult, SurveyDetails, SurveySummary } from './shapes';
 
 const txHashSchema = z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'txHash must be a 32-byte hex string');
 const registerBodySchema = z.object({ txHash: txHashSchema, survey: surveySchema });
@@ -111,6 +112,25 @@ export async function listSurveys(headers: Headers): Promise<{ surveys: SurveySu
   const wallet = await verifyResearcher(headers, 'list_surveys', 0);
   const rows = await listSurveysByResearcher(wallet);
   return { surveys: rows.map(toSummary) };
+}
+
+/** Public list of surveys that accept answers now. No sign-in: the same details are on chain and behind each share link. */
+export async function listOpen(): Promise<{ surveys: OpenSurvey[] }> {
+  const rows = await listOpenSurveys(Math.floor(Date.now() / 1000));
+  return {
+    surveys: rows.map((r) => ({
+      surveyId: r.surveyId,
+      title: r.survey.title,
+      description: r.survey.description,
+      questionCount: r.survey.questions.length,
+      rateWei: r.rateWei.toString(),
+      quota: r.quota,
+      deadline: r.deadline,
+      slotsLeft: Math.max(0, r.quota - r.activeCount),
+      researcher: r.researcher,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  };
 }
 
 /** R4. */

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { LogResponse, LogRow, SurveySummary } from "@/lib/api/shapes";
+import type { HistoryItem, LogResponse, LogRow, OpenSurvey, SurveySummary } from "@/lib/api/shapes";
 import { surveySchema } from "@/lib/survey-schema";
 import type { SurveyJson } from "@/lib/types";
-import { chart, draftToSurvey, logView, responseCode, results, surveyCode, surveyView, toAnswerDraft, toEngineQuestions, total } from "./dashboard";
+import { chart, draftToSurvey, historyView, logView, openView, responseCode, results, surveyCode, surveyView, toAnswerDraft, toEngineQuestions, total } from "./dashboard";
 
 const survey: SurveyJson = {
   title: "Study habits",
@@ -109,5 +109,32 @@ describe("logView", () => {
     const t = chart(v.rows, "today", NOW);
     expect(t.cols).toHaveLength(24);
     expect(t.cols.filter((x) => x.k === "later")).toHaveLength(23 - new Date(NOW).getHours());
+  });
+});
+
+describe("open surveys and my responses", () => {
+  const open: OpenSurvey = {
+    surveyId: 12, title: "Study habits", description: "A short study.", questionCount: 5, rateWei: "1000000000000000", quota: 10,
+    deadline: Date.parse("2026-11-18T23:59:59Z") / 1000, slotsLeft: 4, researcher: "0xabc", createdAt: "2026-11-13T00:00:00Z",
+  };
+
+  it("shows an open survey with a share of filled slots", () => {
+    expect(openView(open, NOW)).toMatchObject({ id: "12", code: "SRV-000012", rate: "0.001 tBNB", slotsLeft: 4, filled: 60, mins: 3, closes: "Nov 18", daysLeft: 6, researcher: "0xabc" });
+    expect(openView({ ...open, questionCount: 1 }, NOW).mins).toBe(1);
+  });
+
+  it("sums only paid answers into the earned total", () => {
+    const item = (id: string, status: HistoryItem["status"], tx: string | null): HistoryItem => ({
+      responseId: id, surveyId: 12, surveyTitle: "Study habits", rateWei: "1000000000000000", submittedAt: "2026-11-13T03:00:00Z",
+      status, result: null, reasons: status === "blocked" ? ["An open-ended answer was not readable text."] : [],
+      txHash: tx ? (`0x${"ab".repeat(32)}` as `0x${string}`) : null, explorerUrl: tx ? `https://testnet.bscscan.com/tx/0x${"ab".repeat(32)}` : null,
+    });
+    const v = historyView([item("a", "paid", "x"), item("b", "paid", "x"), item("c", "blocked", null), item("d", "review", null)], NOW);
+    expect(v.earned).toBe("0.002 tBNB");
+    expect(v.paid).toBe(2);
+    expect(v.rows.map((r) => [r.res, r.amount])).toEqual([["pay", "0.001 tBNB"], ["pay", "0.001 tBNB"], ["no", "0 tBNB"], ["review", "0 tBNB"]]);
+    expect(v.rows[2].why).toBe("An open-ended answer was not readable text.");
+    expect(v.rows[0].txUrl).toContain("bscscan.com/tx/");
+    expect(historyView([], NOW)).toEqual({ rows: [], earned: "0 tBNB", paid: 0 });
   });
 });

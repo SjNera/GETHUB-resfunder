@@ -1,5 +1,5 @@
 // Browser-side client for the API routes (TDD section 7). Shapes come from lib/api/shapes.ts.
-import type { ClosedResult, LogResponse, RegisterResult, ResponseResult, SubmitResult, SurveyDetails, SurveySummary } from "@/lib/api/shapes";
+import type { ClosedResult, HistoryItem, LogResponse, OpenSurvey, RegisterResult, ResponseResult, SubmitResult, SurveyDetails, SurveySummary } from "@/lib/api/shapes";
 import type { Answers, ApiError, AuthProof, ErrorCode, Hex, SurveyJson, WeiString } from "@/lib/types";
 
 export class ApiClientError extends Error {
@@ -48,6 +48,8 @@ export const api = {
   fee: () => call<{ feePerResponseWei: WeiString }>("/api/fee"),
   register: (txHash: Hex, survey: SurveyJson) => call<RegisterResult>("/api/surveys", { method: "POST", body: { txHash, survey } }),
   list: (proof: AuthProof) => call<{ surveys: SurveySummary[] }>("/api/surveys", { headers: authHeaders(proof) }),
+  open: () => call<{ surveys: OpenSurvey[] }>("/api/surveys/open"),
+  myResponses: () => call<{ responses: HistoryItem[] }>("/api/me/responses"),
   survey: (id: number) => call<SurveyDetails>(`/api/surveys/${id}`),
   submit: (b: { surveyId: number; email: string; answers: Answers; startedAt: number; auth: AuthProof }) =>
     call<SubmitResult>("/api/submit", { method: "POST", body: b }),

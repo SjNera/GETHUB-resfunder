@@ -10,9 +10,20 @@ import { ERROR_CODES, type Answers, type AuthAction, type Hex, type SurveyJson }
 import { parseResponseId, readJson, respond, safeErrorText, STATUS_BY_CODE } from './errors';
 import { getLog } from './log';
 import { submitResponse } from './submit';
-import { getSurveyDetails, listSurveys, markSurveyClosed, parseSurveyId, pauseSurvey, registerSurvey } from './surveys';
+import { listMyResponses } from './history';
+import { getSurveyDetails, listOpen, listSurveys, markSurveyClosed, parseSurveyId, pauseSurvey, registerSurvey } from './surveys';
 
 vi.mock('../db/queries', () => import('../db/memory'));
+const sessionWallet = vi.hoisted(() => ({ current: null as string | null }));
+vi.mock('../auth/session', () => ({
+  requireSession: async () => {
+    if (!sessionWallet.current) {
+      const { ApiFailure } = await import('./errors');
+      throw new ApiFailure('WALLET_NOT_VERIFIED', 'Sign in to continue.');
+    }
+    return { userId: 'u1', email: 'x@example.com', wallet: sessionWallet.current };
+  },
+}));
 vi.mock('../chain/escrow', () => ({
   sendDecision: vi.fn(),
   waitForReceipt: vi.fn(),
@@ -542,5 +553,76 @@ describe('R10 pause', () => {
     expectError(await call(() => pauseSurvey(SURVEY_ID, { paused: 'yes' })), 'INVALID_INPUT');
     db.patchSurvey(SURVEY_ID, { status: 'closed' });
     expectError(await call(async () => pauseSurvey(SURVEY_ID, await pauseBody(researcher, true))), 'SURVEY_CLOSED');
+  });
+});
+
+describe('open surveys list', () => {
+  it('lists surveys that accept answers, with no questions in the rows', async () => {
+    expect((await call(() => listOpen())).json).toEqual({ surveys: [] });
+    await register();
+    const { json } = await call(() => listOpen());
+    expect(json.surveys).toHaveLength(1);
+    expect(json.surveys[0]).toMatchObject({
+      surveyId: SURVEY_ID, title: survey.title, questionCount: survey.questions.length, rateWei: RATE.toString(),
+      quota: 2, slotsLeft: 2, researcher: researcher.address.toLowerCase(),
+    });
+    expect(json.surveys[0]).not.toHaveProperty('questions');
+  });
+
+  it('drops paused, closed, past-deadline and full surveys', async () => {
+    await register();
+    db.patchSurvey(SURVEY_ID, { paused: true });
+    expect((await listOpen()).surveys).toHaveLength(0);
+    db.patchSurvey(SURVEY_ID, { paused: false, status: 'closed' });
+    expect((await listOpen()).surveys).toHaveLength(0);
+    db.patchSurvey(SURVEY_ID, { status: 'open', deadline: Math.floor(Date.now() / 1000) - 1 });
+    expect((await listOpen()).surveys).toHaveLength(0);
+    db.patchSurvey(SURVEY_ID, { deadline: Math.floor(Date.now() / 1000) + 3600 });
+    const a = privateKeyToAccount(generatePrivateKey());
+    const b = privateKeyToAccount(generatePrivateKey());
+    await submitResponse(await submitBody(a));
+    expect((await listOpen()).surveys[0].slotsLeft).toBe(1);
+    await submitResponse(await submitBody(b));
+    expect((await listOpen()).surveys).toHaveLength(0);
+  });
+});
+
+describe('my responses', () => {
+  beforeEach(register);
+  afterEach(() => {
+    sessionWallet.current = null;
+  });
+
+  it('WALLET_NOT_VERIFIED without a session', async () => {
+    expectError(await call(() => listMyResponses(new Headers())), 'WALLET_NOT_VERIFIED');
+  });
+
+  it("returns only the wallet's own responses, with their decision", async () => {
+    const other = privateKeyToAccount(generatePrivateKey());
+    const mine = await submitResponse(await submitBody(respondent));
+    await submitResponse(await submitBody(other));
+    const decision = await db.insertDecision({
+      responseId: mine.responseId, result: 'pay', reasons: ['Passed all checks.'], reasonHash: `0x${'11'.repeat(32)}`,
+      signals: { hardFails: [], weak: [] }, ai: null, llmModel: null, rubricVersion: 'v1', status: 'pending',
+    });
+    await db.markDecisionSent(decision!.id, TX_LOWER);
+    await db.confirmDecision(decision!.id, 'paid');
+
+    sessionWallet.current = respondent.address.toLowerCase();
+    const { status, json } = await call(() => listMyResponses(new Headers()));
+    expect(status).toBe(200);
+    expect(json.responses).toHaveLength(1);
+    expect(json.responses[0]).toMatchObject({
+      responseId: mine.responseId, surveyId: SURVEY_ID, surveyTitle: survey.title, rateWei: RATE.toString(),
+      status: 'paid', result: 'pay', reasons: ['Passed all checks.'], txHash: TX_LOWER,
+      explorerUrl: `https://testnet.bscscan.com/tx/${TX_LOWER}`,
+    });
+    expect(json.responses[0]).not.toHaveProperty('answers');
+    expect(json.responses[0]).not.toHaveProperty('email');
+
+    sessionWallet.current = other.address.toLowerCase();
+    expect((await listMyResponses(new Headers())).responses).toHaveLength(1);
+    sessionWallet.current = researcher.address.toLowerCase();
+    expect((await listMyResponses(new Headers())).responses).toHaveLength(0);
   });
 });

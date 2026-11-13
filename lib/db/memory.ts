@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { Hex } from '../types';
 import type {
   DecisionRow,
+  HistoryRow,
   LogRecord,
   NewDecision,
   NewResponse,
@@ -90,6 +91,31 @@ export async function listSurveysByResearcher(wallet: string): Promise<SurveyRow
 
 export async function setSurveyClosed(surveyId: number, refundedWei: bigint, closeTxHash: Hex): Promise<void> {
   patchSurvey(surveyId, { status: 'closed', refundedWei, closeTxHash });
+}
+
+export async function listOpenSurveys(nowUnix: number, limit = 100): Promise<SurveyRow[]> {
+  return surveys
+    .map(withCounts)
+    .filter((s) => s.status === 'open' && !s.paused && s.deadline > nowUnix && s.activeCount < s.quota)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+}
+
+export async function listResponsesByWallet(wallet: string, limit = 200): Promise<HistoryRow[]> {
+  return responses
+    .filter((r) => r.wallet === wallet.toLowerCase())
+    .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
+    .slice(0, limit)
+    .map((r) => {
+      const survey = surveys.find((s) => s.surveyId === r.surveyId)!;
+      const d = decisions.find((x) => x.responseId === r.id);
+      return {
+        response: publicResponse(r),
+        surveyTitle: survey.survey.title,
+        rateWei: survey.rateWei,
+        decision: d ? { result: d.result, reasons: d.reasons, status: d.status, txHash: d.txHash } : null,
+      };
+    });
 }
 
 export async function setSurveyPaused(surveyId: number, paused: boolean): Promise<boolean> {
