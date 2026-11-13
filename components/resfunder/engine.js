@@ -507,7 +507,7 @@ function vAnswer(){const done=answeredIds(),looking=S.busy==='lookup';
   const listHtml=D.openErr?`<div class="card empty"><h3>Couldn't load the open surveys</h3><p>${esc(D.openErr)}</p><button class="btn dark" data-act="reloadOpen">Try again</button></div>`
     :!D.open?`<div class="card empty"><h3>Loading open surveys</h3></div>`
     :list.length?`<div class="acards">${list.map(card).join('')}</div>`:`<p class="muted sect-e">No other surveys are open right now. If you have a link, paste it above.</p>`;
-  return header('<span>Pwede ka ring magsagot ng survey</span>','Answer surveys',`<button class="btn" data-nav="finance-payouts">See your answers ${I.arrow}</button>`)+
+  return header('','Answer surveys',`<button class="btn" data-nav="finance-payouts">See your answers ${I.arrow}</button>`)+
   `<div class="kpis k3" style="margin-bottom:18px">${kpi(I.coins,D.hist?D.hist.earned:'—','','','Earned as a respondent')}
     ${kpi(I.check,D.hist?D.hist.rows.length:'—','','','Surveys answered')}
     ${kpi(I.peso,best?best.rate:'—',best?'per answer':'','n','Highest pay open')}</div>

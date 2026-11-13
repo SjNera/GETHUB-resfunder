@@ -1498,7 +1498,7 @@ function vAnswer(){const lbl={pay:['p-pay','Paid'],review:['p-rev','In review'],
       ${a?`<div class="adone">${I.check}Answered · <span class="pill ${lbl[a][0]}">${lbl[a][1]}</span></div>`:`<button class="btn dark" data-answer="${s.id}">Answer survey ${I.arrow}</button>`}</article>`};
   const today=MYPAY.filter(p=>p.fresh&&p.st==='paid').reduce((x,p)=>x+p.amt,0),inRev=MYPAY.filter(p=>p.st==='review').length,
     open=list.filter(s=>!S.answered[s.id]),best=open.length?Math.max(...open.map(s=>s.rate)):0;
-  return header('<span>Pwede ka ring magsagot ng survey</span>','Answer surveys',`<button class="btn" data-nav="finance-payouts">See payouts ${I.arrow}</button>`)+
+  return header('','Answer surveys',`<button class="btn" data-nav="finance-payouts">See payouts ${I.arrow}</button>`)+
   `<div class="kpis k3" style="margin-bottom:18px">${kpi(I.coins,peso(earned()),today?'+'+peso(today)+' today':'this month',today?'up':'n','Earned as a respondent')}
     ${kpi(I.check,MYPAY.length,inRev?inRev+' in review':'all decided','n','Surveys answered')}
     ${kpi(I.peso,best?peso(best):'—',best?'per answer':'','n','Highest pay open')}</div>
