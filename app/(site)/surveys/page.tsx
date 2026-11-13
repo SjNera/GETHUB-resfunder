@@ -1,6 +1,8 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { SurveyList } from "@/components/results/survey-list";
 
-// The app at / (ported from the demo artifact) covers this screen.
+export const metadata: Metadata = { title: "My surveys" };
+
 export default function Page() {
-  redirect("/");
+  return <SurveyList />;
 }
