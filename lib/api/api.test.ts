@@ -497,7 +497,8 @@ describe('screening details', () => {
   beforeEach(register);
 
   it('returns checks, the AI result with its flagged answers, and timing, newest first', async () => {
-    const flagged = [{ questionId: 'q7', label: 'unclear' as const, type: 'other' as const, injection: false, agreed: false, reason: 'The AI check was inconclusive.' }];
+    const runs = [{ label: 'valid' as const, type: null, injection: false, reason: 'Names a challenge.' }, null];
+    const flagged = [{ questionId: 'q7', label: 'unclear' as const, type: 'other' as const, injection: false, agreed: false, reason: 'The AI check was inconclusive.', runs }];
     const review = await submitResponse(await submitBody(privateKeyToAccount(generatePrivateKey())));
     db.patchResponse(review.responseId, { startedAt: new Date(Date.now() - 200_000), submittedAt: new Date(Date.now() - 10_000) });
     await db.insertDecision({
@@ -521,6 +522,7 @@ describe('screening details', () => {
       weak: ['too_fast'],
       ai: { label: 'unclear', type: 'other', injection: false, agreed: false, reason: 'The AI check was inconclusive.', flagged },
     });
+    expect(rows[1].ai?.flagged?.[0].runs).toEqual(runs);
     expect(rows[0]).toMatchObject({ screened: false, hardFails: [], weak: [], ai: null });
   });
 

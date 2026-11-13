@@ -48,7 +48,7 @@ const me=()=>{const email=S.auth.email||'',name=email.split('@')[0].split(/[._-]
 const S={boot:true,authed:false,landing:true,wallet:'',after:null,want:'',auth:{stage:'login',email:'',pw:'',show:false,wallet:'',busy:'',err:'',pf:null},
   page:'dashboard',sid:'',stab:'overview',finsub:'wallet',answered:{},sideOpen:false,
   draft:{},launched:{},closeAsk:false,closeErr:'',busy:'',fundErr:'',
-  openRev:null,qQ:'',reasonFor:null,reason:'',dbusy:'',derr:'',
+  openRev:null,fi:0,fdir:'',runsOpen:false,qQ:'',reasonFor:null,reason:'',dbusy:'',derr:'',
   range:'week',day:null,chart:null,pace:0,lQ:'',lRes:'all',lSel:new Set(),fOpen:false,rq:{},fsub:'all',rv:'all',ri:0,jLink:'',
   sv:null};
 
@@ -359,7 +359,7 @@ function sQueue(){
   return `<div class="tools"><label class="sbox">${I.search}<input id="qQ" data-in="qQ" type="search" placeholder="Search by ID or wallet" value="${esc(S.qQ)}" aria-label="Search the review queue"></label></div>
     <div id="qBody">${queueTable()}</div>`}
 /* Why a response was decided (bridge explain()). Before the screening details load, the reason text stands in. */
-const X=r=>r.x||{title:r.why,sub:'',pills:[],steps:[],focus:null,others:[],time:null,timeNote:null,you:null};
+const X=r=>r.x||{title:r.why,sub:'',pills:[],flags:[],rules:[],others:null,time:null,timeNote:null,you:null};
 const MK={pass:'✓',warn:'!',fail:'✕',skip:'–'};
 const whyCell=r=>{const x=X(r);return `<b class="why-t">${esc(x.title)}</b>${x.pills.length?`<span class="xp">${x.pills.map(p=>`<span class="xpill ${p.tone}"><i aria-hidden="true">${MK[p.tone]}</i>${esc(p.label)}</span>`).join('')}</span>`:''}`};
 /* Any row of an opened survey, for the drawer. Review rows also get prev/next and the decision. */
@@ -376,29 +376,45 @@ function recordFoot(r){
   if(r.res==='pending')return `<p class="rd2-fine rd2-left">Still being checked. This updates on Refresh.</p>`;
   return `<div class="rd2-rec"><span>${r.res==='pay'?'Paid.':'Final.'} Recorded on chain.</span>${r.txUrl?`<a class="rd2-tx mono" href="${r.txUrl}" target="_blank" rel="noopener">${r.tx} ↗</a>`:''}</div>`}
 const RDST={review:['rev','In review'],pay:['pay','Paid'],no:['no','Not paid'],pending:['rev','Checking']};
+/* The flagged answer card. Several flags page with ‹ 1 of n ›; an AI flag's tag opens both runs. */
+function flagCard(r,x){const F=x.flags;if(!F.length)return '';const n=F.length,i=Math.min(S.fi,n-1),f=F[i],open=!!S.runsOpen;
+  const pager=n>1?`<span class="rd2-pager"><button class="rd2-pg" data-fi="-1" aria-label="Previous flagged answer" ${i<=0?'disabled':''}>${I.chevL}</button><span class="rd2-pgn" aria-live="polite">${i+1} of ${n}</span><button class="rd2-pg" data-fi="1" aria-label="Next flagged answer" ${i>=n-1?'disabled':''}>${I.chev}</button></span>`:'';
+  const runs=f.runs?`<div class="rd2-rgrid">${f.runs.map(u=>`<div class="rd2-run"><p class="rd2-rn">Run ${u.n}</p><p class="rd2-rl ${u.tone}">${esc(u.label)}</p>${u.failed?'<p class="rd2-rm">The call failed, timed out or the reply was not usable.</p>':`<p class="rd2-rm">Instructions found: ${u.instructions?'<b>Yes</b>':'No'}</p>${u.reason?`<p class="rd2-rq">“${esc(u.reason)}”</p>`:''}`}</div>`).join('')}</div><p class="rd2-note">${esc(f.note)}</p>`
+    :`${f.aiSays?`<p class="rd2-says"><small>The AI's reason, as written</small>“${esc(f.aiSays)}”</p>`:''}<p class="rd2-note">${esc(f.note)} Run details weren't saved for this response.</p>`;
+  const foot=f.ai?`<div class="rd2-ai"><p class="rd2-tagrow"><button class="rd2-tag warn rd2-tagbtn" data-act="runs" aria-expanded="${open}" aria-controls="rdRuns">${esc(f.tag)}<span class="rd2-tchev" aria-hidden="true">${I.down}</span></button><span>${esc(f.detail)}</span></p>
+      <div class="rd2-runs" id="rdRuns" data-open="${open}" ${open?'':'inert'}><div class="rd2-runs-in">${runs}</div></div></div>`
+    :`<p class="rd2-ai rd2-tagrow"><span class="rd2-tag ${f.tone}">${esc(f.tag)}</span><span>${esc(f.note)}</span></p>`;
+  return `<section class="rd2-fig ${S.fdir?'rd2-in-'+S.fdir:''}" aria-labelledby="rdFlagH"><div class="rd2-fhead"><h3 id="rdFlagH">${f.ai?'Flagged answer':'Failed answer'}</h3>${pager}</div>
+    <p class="rd2-fq">Q${f.qi+1} · ${esc(f.question)}</p><blockquote class="${f.ai?'':'mono'}">${f.answer?esc(f.answer):'<span class="muted">No answer</span>'}</blockquote>${foot}</section>`}
+/* The four rules in the order they run, the one that decided, and the ones never reached. */
+const ruleMark=u=>u.state==='fired'?MK[u.tone]:u.state==='pass'?'✓':'–';
+const ruleList=x=>x.rules.length?`<section aria-labelledby="rdRule"><h3 class="rd2-h" id="rdRule">Rule engine</h3><ol class="rd2-list rd2-rules">${x.rules.map(u=>`<li class="${u.state}"><span class="rd2-mk ${u.state==='fired'?u.tone:u.state==='pass'?'pass':'skip'}" aria-hidden="true">${ruleMark(u)}</span><span class="l">${esc(u.ask)}${u.state==='fired'?'<span class="sr"> Decided here.</span>':''}</span><span class="v">${u.value?`<span>${esc(u.value)}</span>`:''}${u.outcome?`<span class="rd2-out ${u.tone}">→ ${esc(u.outcome)}</span>`:''}</span></li>`).join('')}</ol></section>`:'';
 function reviewPanel(){const r=revRow(S.openRev)||anyRow(S.openRev);if(!r)return '';const w=W(r.sid),Q=w.survey.q,x=X(r),rev=r.res==='review';
-  const P=rev?reviews():[],i=P.findIndex(y=>y.key===r.key),f=x.focus,tag=new Map(x.others.map(o=>[o.qi,o.tag]));
-  const nav=rev?`<button class="rd2-ib" data-step="-1" aria-label="Previous response" ${i<=0?'disabled':''}>${I.chevL}</button><span class="rd2-count">${i+1} of ${P.length}</span><button class="rd2-ib" data-step="1" aria-label="Next response" ${i>=P.length-1?'disabled':''}>${I.chev}</button>`:'';
-  const fig=f?`<figure class="rd2-fig"><figcaption>Q${f.qi+1} · ${esc(f.question)}</figcaption><blockquote class="${f.tone==='fail'?'mono':''}">${f.answer?esc(f.answer):'<span class="muted">No answer</span>'}</blockquote>
-      <div class="rd2-ai"><p class="rd2-tagrow"><span class="rd2-tag ${f.tone}">${esc(f.tag)}</span>${f.chips.map(esc).join(' · ')}</p>${f.aiSays?`<p class="rd2-says"><small>The AI's reason, as written</small>“${esc(f.aiSays)}”</p>`:''}${f.note?`<p class="rd2-note">${esc(f.note)}</p>`:''}</div></figure>`:'';
-  const steps=x.steps.length?`<section aria-labelledby="rdHow"><h3 class="rd2-h" id="rdHow">How it was decided</h3><ol class="rd2-list">${x.steps.map(s=>`<li class="${s.decided?'on':''}"><span class="rd2-mk ${s.tone}" aria-hidden="true">${MK[s.tone]}</span><span class="l">${esc(s.label)}</span><span class="v ${s.decided?s.tone:''}">${esc(s.value)}</span></li>`).join('')}</ol></section>`:'';
-  const rest=Q.map((q,j)=>j).filter(j=>!f||j!==f.qi);
-  const oa=rest.map(j=>{const t=ansText(Q[j],r.a[j]),g=tag.get(j);return `<div><dt>Q${j+1} · ${esc(Q[j].t)}${g?` <span class="rd2-tag warn">${esc(g)}</span>`:''}</dt><dd class="${t?'':'muted'}">${t?esc(t):'No answer'}</dd></div>`}).join('');
+  const P=rev?reviews():[],i=P.findIndex(y=>y.key===r.key);
+  const nav=rev?`<button class="rd2-ib" data-step="-1" aria-label="Previous response" ${i<=0?'disabled':''}>${I.chevL}</button><span class="rd2-count">Response ${i+1} of ${P.length}</span><button class="rd2-ib" data-step="1" aria-label="Next response" ${i>=P.length-1?'disabled':''}>${I.chev}</button>`:'';
+  const rest=x.others||Q.map((q,j)=>j);
+  const oa=rest.map(j=>{const t=ansText(Q[j],r.a[j]);return `<div><dt>Q${j+1} · ${esc(Q[j].t)}</dt><dd class="${t?'':'muted'}">${t?esc(t):'No answer'}</dd></div>`}).join('');
   const chev=`<span class="rd2-chev" aria-hidden="true">${I.chev}</span>`;
   return `<div class="backdrop" data-act="closeRev"></div><aside class="drawer rd rd2" role="dialog" aria-modal="true" aria-labelledby="rdTitle">
     <div class="rd2-top">${nav}<span class="sp"></span><button class="rd2-x" data-act="closeRev" aria-label="Close">${I.x}</button></div>
     <div class="rd2-body">
       <header><p class="rd2-status"><span class="st"><i class="${RDST[r.res][0]}"></i><b>${RDST[r.res][1]}</b></span><span aria-hidden="true">·</span><span class="mono">${r.rid}</span></p>
         <h2 id="rdTitle">${esc(x.title)}</h2>${x.sub?`<p class="rd2-sub">${esc(x.sub)}</p>`:''}</header>
-      ${fig}${steps}
+      <div id="rdFlagWrap">${flagCard(r,x)}</div>${ruleList(x)}
       <div class="rd2-list rd2-more">
-        ${rest.length?`<details><summary><span class="l">${f?'Other answers':'Answers'}</span><span class="v">${rest.length}</span>${chev}</summary><dl class="rd2-oa">${oa}</dl></details>`:''}
+        ${rest.length?`<details><summary><span class="l">${x.flags.length?'Other answers':'Answers'}</span><span class="v">${rest.length}</span>${chev}</summary><dl class="rd2-oa">${oa}</dl></details>`:''}
         <details><summary><span class="l">Timing</span><span class="v">${x.time||'—'}</span>${chev}</summary><p>${esc(x.timeNote||'Timing shows once screening finishes.')}</p></details>
         <details><summary><span class="l">Respondent</span><span class="v mono">${r.w}</span>${chev}</summary><p>Submitted ${r.when}. <button class="au-link" data-act="copyW" data-w="${r.wallet}">Copy wallet address</button></p></details>
       </div>
     </div>
     <div class="rd2-foot">${rev?decideFoot(r,w):recordFoot(r)}</div></aside>`}
-
+/* Pager and runs change only their own part of the drawer, so it doesn't slide in again. */
+function stepFlag(dir){const r=revRow(S.openRev)||anyRow(S.openRev);if(!r)return;const x=X(r),j=Math.max(0,Math.min(x.flags.length-1,(S.fi||0)+dir));
+  if(j===S.fi)return;S.fi=j;S.fdir=dir>0?'next':'prev';const wr=document.getElementById('rdFlagWrap');if(wr)wr.innerHTML=flagCard(r,x);
+  const b=wr&&wr.querySelector('[data-fi="'+dir+'"]');if(b&&!b.disabled)b.focus();else{const o=wr&&wr.querySelector('[data-fi]:not([disabled])');if(o)o.focus()}}
+function toggleRuns(btn){S.runsOpen=!S.runsOpen;const p=document.getElementById('rdRuns');if(btn)btn.setAttribute('aria-expanded',String(S.runsOpen));
+  if(p){p.dataset.open=String(S.runsOpen);p.toggleAttribute('inert',!S.runsOpen)}}
+const resetRev=()=>{S.fi=0;S.fdir='';S.runsOpen=false};
 /* Decision log */
 const RESL={pay:['','Paid'],no:['no','Not paid'],review:['rev','In review'],pending:['rev','Checking']};
 function logFiltered(){const w=W(S.sid),q=S.lQ.trim().toLowerCase();return w.log.rows.filter(r=>(S.lRes==='all'||r.res===S.lRes)&&(!q||[r.rid,r.wallet,r.why,X(r).title].join(' ').toLowerCase().includes(q)))}
@@ -770,13 +786,14 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'doClose':{if(S.busy)return;const id=s.id;S.busy='confirm';S.closeErr='';render();
       B.close(id,p=>{S.busy=p;render()}).then(r=>{S.busy='';S.closeAsk=false;render();toast(`Closed · ${r.refunded} returned to your wallet`);loadWs(id,true);loadList(true);loadBalance()},
         e=>{S.busy='';S.closeErr=B.text(e);render()});break;}
-    case 'closeRev':if(S.dbusy)return;S.openRev=null;S.reasonFor=null;S.derr='';render();break;
+    case 'runs':toggleRuns(el);break;
+    case 'closeRev':if(S.dbusy)return;S.openRev=null;resetRev();S.reasonFor=null;S.derr='';render();break;
     case 'askNo':S.reasonFor=el.dataset.id;S.reason=B.rejectReasons[0][0];S.derr='';render();break;
     case 'cancelNo':S.reasonFor=null;render();break;
     case 'decide':{if(S.dbusy)return;const key=el.dataset.id,dd=el.dataset.d,r=revRow(key);if(!r)break;const w=W(r.sid);
       S.dbusy=dd==='pay'?'pay':'no';S.derr='';render();
       B.decide(key,dd,dd==='dont_pay'?S.reason:undefined).then(async res=>{await loadWs(r.sid,true);
-          S.dbusy='';S.reasonFor=null;const P=reviews();S.openRev=P.length?(P.find(x=>x.key!==key)||P[0]).key:null;render();
+          S.dbusy='';S.reasonFor=null;const P=reviews();S.openRev=P.length?(P.find(x=>x.key!==key)||P[0]).key:null;resetRev();render();
           toast(dd==='pay'?(res.status==='paid'?`Paid ${w.survey.rate}`:"The payment didn't go through. It is back in review."):(res.status==='blocked'?'Not paid. The decision is recorded on chain.':"The decision didn't go through. It is back in review."));
           if(dd==='pay')loadBalance()},
         e=>{S.dbusy='';S.derr=B.text(e);render()});break;}
@@ -799,7 +816,7 @@ function ract(a){const R=S.sv;
 
 
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-nav],[data-act],[data-open],[data-openrev],[data-answer],[data-stab],[data-fsub],[data-rv],[data-ri],[data-range],[data-day],[data-step],[data-reason],[data-fres],[data-rgo],[data-ract],[data-chk],[data-chkall],#toastUndo');
+  const t=e.target.closest('[data-nav],[data-act],[data-open],[data-openrev],[data-answer],[data-stab],[data-fsub],[data-rv],[data-ri],[data-range],[data-day],[data-step],[data-fi],[data-reason],[data-fres],[data-rgo],[data-ract],[data-chk],[data-chkall],#toastUndo');
   if(S.fOpen&&!e.target.closest('.fwrap')){S.fOpen=false;if(!t){render();return}}
   if(!t||t.disabled)return;const d=t.dataset;
   if(t.id==='toastUndo'){if(lastUndo){const f=lastUndo;lastUndo=null;f()}return}
@@ -807,7 +824,8 @@ document.addEventListener('click',e=>{
   if(d.chkall){logFiltered().forEach(r=>t.checked?S.lSel.add(r.key):S.lSel.delete(r.key));refreshLog();return}
   if(d.nav){nav(d.nav);return}
   if(d.open){openSurvey(d.open);return}
-  if(d.openrev){S.openRev=d.openrev;render();return}
+  if(d.openrev){S.openRev=d.openrev;resetRev();render();return}
+  if(d.fi){stepFlag(+d.fi);return}
   if(d.answer){S.jLink='';openByLink(d.answer,'card');return}
   if(d.stab){S.stab=d.stab;S.fOpen=false;render();return}
   if(d.fsub){S.fsub=d.fsub;render();return}
@@ -815,7 +833,7 @@ document.addEventListener('click',e=>{
   if(d.ri){S.ri=Math.max(0,Math.min(indLen()-1,S.ri+(+d.ri)));render();return}
   if(d.range){S.range=d.range;S.day=null;const c=document.getElementById('chartCard');if(c)c.innerHTML=chartCard();return}
   if(d.day!=null){S.day=+d.day;refreshPlot();return}
-  if(d.step){const P=reviews(),i=P.findIndex(x=>x.key===S.openRev),j=i+(+d.step);if(i>=0&&j>=0&&j<P.length){S.openRev=P[j].key;render()}return}
+  if(d.step){const P=reviews(),i=P.findIndex(x=>x.key===S.openRev),j=i+(+d.step);if(i>=0&&j>=0&&j<P.length){S.openRev=P[j].key;resetRev();render()}return}
   if(d.reason!=null){S.reason=d.reason;render();return}
   if(d.fres){S.lRes=d.fres;render();return}
   if(d.rgo){rgo(d.rgo,d.rdir);return}
@@ -866,7 +884,7 @@ document.addEventListener('change',e=>{const el=e.target,d=el.dataset;if(!d)retu
 });
 document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.col');if(!c)return;const i=+c.dataset.day;if(i===S.day)return;S.day=i;refreshPlot()});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){if(S.closeAsk){if(!S.busy){S.closeAsk=false;render()}}else if(S.sv){svClose()}else if(S.openRev){S.openRev=null;render()}else if(S.fOpen){S.fOpen=false;render()}else if(S.sideOpen){S.sideOpen=false;render()}return}
+  if(e.key==='Escape'){if(S.closeAsk){if(!S.busy){S.closeAsk=false;render()}}else if(S.sv){svClose()}else if(S.openRev){if(S.dbusy)return;S.openRev=null;resetRev();render()}else if(S.fOpen){S.fOpen=false;render()}else if(S.sideOpen){S.sideOpen=false;render()}return}
   if(e.key==='Enter'&&e.target.matches&&e.target.matches('input.inp,#jLink,#aPw')){const au=S.auth.stage==='register'?'authRegister':'authLogin',m={aEmail:au,aPw:au,jLink:'openLink'}[e.target.id];if(m){e.preventDefault();act(m)}}
 });
 function fromHash(){const h=(location.hash||'').slice(1);if(!h||!S.authed)return;if(h.startsWith('survey-')){const [,sid,tab]=h.split('-');if(SV(sid)&&!(S.page==='survey'&&S.sid===sid&&S.stab===(tab||S.stab)))openSurvey(sid,tab)}else if(/^(dashboard|surveys|answer|settings|help)$/.test(h))S.page=h;else if(/^finance-(wallet|payouts|refunds)$/.test(h)){S.page='finance';S.finsub=h.slice(8)}}

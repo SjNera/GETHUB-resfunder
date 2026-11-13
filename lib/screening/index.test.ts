@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AiResult, ScreenInput, SurveyJson } from '../types';
 import { runChecks } from './checks';
-import { INCONCLUSIVE_REASON } from './combine';
+import { INCONCLUSIVE_REASON, type AiRun } from './combine';
 import { SCREENING_ERROR_REASON, screen, screenWith, type ScreenDeps } from './index';
 import { INJECTION_REASON, PASS_REASON } from './rules';
 
@@ -77,6 +77,16 @@ describe('screen', () => {
     expect(out.reasons).toEqual(reasons);
     const { label, type, injection, agreed, reason } = ai;
     expect(out.ai).toEqual({ ...ai, flagged: [{ questionId: 'q2', label, type, injection, agreed, reason }] });
+  });
+
+  it('keeps both AI runs on a flagged answer', async () => {
+    const runs = [
+      { label: 'valid' as const, type: null, injection: false, reason: 'Names a method.' },
+      { label: 'unclear' as const, type: 'evasive' as const, injection: false, reason: 'Too vague.' },
+    ] as [AiRun, AiRun];
+    const out = await screenWith(input(CLEAN), deps(async () => ({ ...DISAGREED, runs })).deps);
+    expect(out.result).toBe('review');
+    expect((out.ai as { flagged?: { runs?: unknown }[] } | null)?.flagged?.[0].runs).toEqual(runs);
   });
 
   it('records which answers the AI flagged, without changing the decision', async () => {

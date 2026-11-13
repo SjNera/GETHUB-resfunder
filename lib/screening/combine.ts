@@ -25,6 +25,18 @@ export function combineRuns(runA: AiRun | null, runB: AiRun | null): AiResult {
   };
 }
 
+/** What one run answered, kept for the researcher's review. Null: the call failed, timed out or was not usable. */
+export type AiRunRecord = AiRun | null;
+
+/** An answer's combined result plus both runs as they came back. */
+export type AiResultWithRuns = AiResult & { runs?: [AiRunRecord, AiRunRecord] };
+
+/** Adds both runs to a combined result. The decision fields are unchanged. */
+export function withRuns(result: AiResult, runA: AiRun | null, runB: AiRun | null): AiResultWithRuns {
+  const copy = (r: AiRun | null): AiRunRecord => (r ? { label: r.label, type: r.type, injection: r.injection, reason: r.reason } : null);
+  return { ...result, runs: [copy(runA), copy(runB)] };
+}
+
 /** One open-ended answer the AI did not clear: not valid, flagged for injection, or the two runs split. */
 export interface AiFlag {
   questionId: string;
@@ -33,18 +45,21 @@ export interface AiFlag {
   injection: boolean;
   agreed: boolean;
   reason: string;
+  /** Both runs for this answer, when they were saved. */
+  runs?: [AiRunRecord, AiRunRecord];
 }
 
 /** The AI result plus the answers it flagged. Stored as-is in decisions.ai_result. */
 export type AiResultWithFlags = AiResult & { flagged?: AiFlag[] };
 
 /** The answers that did not get a clean, agreed "valid", by question id, in survey order. */
-export function flaggedAnswers(questionIds: string[], results: AiResult[]): AiFlag[] {
-  return results.flatMap((r, i) =>
-    r.label !== 'valid' || r.injection || !r.agreed
-      ? [{ questionId: questionIds[i], label: r.label, type: r.type, injection: r.injection, agreed: r.agreed, reason: r.reason }]
-      : [],
-  );
+export function flaggedAnswers(questionIds: string[], results: AiResultWithRuns[]): AiFlag[] {
+  return results.flatMap((r, i) => {
+    if (r.label === 'valid' && !r.injection && r.agreed) return [];
+    const flag: AiFlag = { questionId: questionIds[i], label: r.label, type: r.type, injection: r.injection, agreed: r.agreed, reason: r.reason };
+    if (r.runs) flag.runs = r.runs;
+    return [flag];
+  });
 }
 
 const SEVERITY: Record<AiLabel, number> = { valid: 0, unclear: 1, non_answer: 2 };

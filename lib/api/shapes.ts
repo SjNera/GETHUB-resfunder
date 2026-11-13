@@ -116,6 +116,9 @@ export function explorerUrl(txHash: Hex | null): string | null {
 
 // ---------- Screening details (added; not one of the TDD 7 routes) ----------
 
+/** What one AI run answered. Null: the call failed, timed out or the reply was not usable. */
+export type ScreeningRun = { label: AiLabel; type: AiType | null; injection: boolean; reason: string } | null;
+
 /** An open-ended answer the AI did not clear. */
 export interface ScreeningFlag {
   questionId: string;
@@ -124,6 +127,8 @@ export interface ScreeningFlag {
   injection: boolean;
   agreed: boolean;
   reason: string;
+  /** Run 1 and run 2. Null for decisions screened before runs were saved. */
+  runs: ScreeningRun[] | null;
 }
 
 /** How one response was screened. Shown in the researcher's review drawer. */
