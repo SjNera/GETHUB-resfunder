@@ -13,9 +13,34 @@ export { WalletError };
 
 /** Spec 5.4: the UI may cache a proof for up to 9 minutes (the server accepts 10). */
 export const PROOF_TTL_MS = 9 * 60_000;
-const proofs = new Map<string, AuthProof>();
+const PROOFS_KEY = "rf-proofs-v1";
+/** Read proofs survive a reload (same tab only), so a refresh doesn't ask MetaMask again. */
+const proofs = new Map<string, AuthProof>(loadProofs());
 
-const code = (e: unknown) => (e as { code?: number })?.code;
+function loadProofs(): [string, AuthProof][] {
+  try {
+    return typeof sessionStorage === "undefined" ? [] : (JSON.parse(sessionStorage.getItem(PROOFS_KEY) ?? "[]") as [string, AuthProof][]);
+  } catch {
+    return [];
+  }
+}
+function saveProofs() {
+  try {
+    sessionStorage.setItem(PROOFS_KEY, JSON.stringify([...proofs]));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** The wallet's error code. viem wraps the wallet error, so the code can sit a few causes down. */
+function code(e: unknown): number | undefined {
+  let cur = e as { code?: number; cause?: unknown } | undefined;
+  for (let i = 0; cur && i < 6; i++) {
+    if (typeof cur.code === "number") return cur.code;
+    cur = cur.cause as typeof cur;
+  }
+  return undefined;
+}
 
 function provider() {
   const p = getProvider();
@@ -55,7 +80,10 @@ export async function signProof(action: AuthAction, surveyId: number, wallet: st
     const signature = (await p.request({ method: "personal_sign", params: [toHex(message), wallet] })) as Hex;
     const proof: AuthProof = { wallet: wallet.toLowerCase(), signature, timestamp: now };
     // Only reads are cached: a submit proof is single use.
-    if (action === "view_log" || action === "list_surveys") proofs.set(key, proof);
+    if (action === "view_log" || action === "list_surveys") {
+      proofs.set(key, proof);
+      saveProofs();
+    }
     return proof;
   } catch (e) {
     return wrap(e, "Couldn't sign the request.");
@@ -64,6 +92,7 @@ export async function signProof(action: AuthAction, surveyId: number, wallet: st
 
 export function clearProofs() {
   proofs.clear();
+  saveProofs();
 }
 
 function escrow(): Address {
