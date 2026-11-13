@@ -273,7 +273,7 @@ function vDashboard(){
 function vSurveys(){
   const f=S.fsub,cnt=k=>SURVEYS.filter(s=>k==='all'||s.status===k).length,list=SURVEYS.filter(s=>f==='all'||s.status===f);
   const none={all:'No surveys yet. Create one to get started.',live:'No live surveys right now.',closed:'No closed surveys yet.',draft:'No drafts. Start one with Create a survey.'};
-  return header('','Surveys',`<button class="btn" data-act="reload">Refresh</button><button class="btn fund" data-act="newFund">${I.plus}Create a survey</button>`)+pendBar()+
+  return header('','Surveys',`<button class="btn fund" data-act="newFund">${I.plus}Create a survey</button>`)+pendBar()+
   `<div class="tabsrow"><div class="tabs fit" role="tablist" aria-label="Filter surveys">${[['all','All'],['live','Live'],['closed','Closed'],['draft','Drafts']].map(([v,l])=>`<button role="tab" data-fsub="${v}" aria-selected="${f===v}">${l}<span class="sc">${cnt(v)}</span></button>`).join('')}</div></div>
   ${surveysBlock(list,none[f])}${list.length?`<div class="tfoot"><span>Showing ${list.length} of ${SURVEYS.length}</span></div>`:''}`;
 }
