@@ -46,9 +46,8 @@ a{color:inherit}
 .shell{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:calc(100vh - 34px)}
 .side{position:sticky;top:0;align-self:start;height:calc(100vh - 34px);background:var(--card);border-right:1px solid var(--line);padding:18px 14px 14px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding-left:max(14px,env(safe-area-inset-left,0px))}
 .brand{display:flex;align-items:center;gap:10px;font:700 21px/1 var(--f-head);letter-spacing:-.02em;padding:4px 6px}
-.logo{position:relative;width:32px;height:20px;flex:none}
-.logo::before,.logo::after{content:"";position:absolute;top:0;width:20px;height:20px;border-radius:50%}
-.logo::before{left:0;background:var(--black)} .logo::after{left:12px;background:var(--orange);mix-blend-mode:multiply}
+/* Brand mark, same paths as public/brand/resfunder-mark.svg */
+.logo{width:26px;height:26px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='%23121212' d='M23.8 9.7 L32 5 L40.2 9.7 M55.4 36.1 L55.4 45.5 L47.2 50.3 M40.2 54.3 L32 59 L23.8 54.3 M16.8 50.3 L8.6 45.5 L8.6 36.1 M8.6 27.9 L8.6 18.5 L16.8 13.8'/%3E%3Cpath stroke='%23ff8a1c' d='M15 41 L24 32 L31 38 L55.4 18.5 M47.2 13.8 L55.4 18.5 L55.4 27.9'/%3E%3C/svg%3E") center/contain no-repeat}
 .brand .sp{flex:1}
 .ibtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line-2);background:var(--card);display:inline-grid;place-items:center;padding:0;flex:none}
 .ibtn svg{width:17px;height:17px}
