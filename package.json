@@ -10,6 +10,7 @@
     "test": "vitest run",
     "lint": "eslint",
     "check": "next typegen && tsc --noEmit && vitest run",
+    "test:chain": "cd contracts && npx hardhat build && cd .. && vitest run --config vitest.chain.config.mts",
     "db:apply": "node --env-file=.env scripts/apply-schema.mjs"
   },
   "dependencies": {
