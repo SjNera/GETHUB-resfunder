@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { AccountPanel } from "@/components/auth/account-panel";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Your account" };
-
+// The dashboard at / has the account settings now.
 export default function Page() {
-  return <AccountPanel />;
+  redirect("/#settings");
 }

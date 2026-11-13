@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { SurveyBuilder } from "@/components/survey-builder/survey-builder";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Publish a survey" };
-
+// The dashboard at / builds and funds surveys now.
 export default function Page() {
-  return <SurveyBuilder />;
+  redirect("/?go=publish");
 }

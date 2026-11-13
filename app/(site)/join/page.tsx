@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { JoinForm } from "@/components/respond/join-form";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Answer a survey" };
-
+// The dashboard at / opens a survey by its link now.
 export default function Page() {
-  return <JoinForm />;
+  redirect("/?go=answer");
 }

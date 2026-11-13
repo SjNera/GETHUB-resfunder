@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { SurveyList } from "@/components/results/survey-list";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "My surveys" };
-
+// The dashboard at / lists the researcher's surveys now.
 export default function Page() {
-  return <SurveyList />;
+  redirect("/#surveys");
 }
