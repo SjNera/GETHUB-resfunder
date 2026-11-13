@@ -5,7 +5,6 @@ export function startResFunder(bridge) {
   if (started) return;
   started = true;
 (function(){
-const FLOWS='https://claude.ai/artifact/Heuys32xNT1X8TgYKwLYLX';
 const sv=p=>'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
 const I={check:sv('<path d="M3.5 8.5l3 3 6-7"/>'),x:sv('<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>'),clock:sv('<circle cx="8" cy="8" r="6"/><path d="M8 5v3.2l2 1.3"/>'),
   chev:sv('<path d="M6 4l4 4-4 4"/>'),chevL:sv('<path d="M10 4L6 8l4 4"/>'),down:sv('<path d="M4 6l4 4 4-4"/>'),arrow:sv('<path d="M3 8h10M9 4l4 4-4 4"/>'),
@@ -294,10 +293,11 @@ function vSurvey(){
     return header(crumb,esc(s.title),'')+(er?`<div class="card empty"><h3>Couldn't open this survey</h3><p>${esc(er)}</p><button class="btn dark" data-act="reopen">Try again</button></div>`
       :`<div class="card empty"><h3>Opening the survey</h3><p>MetaMask may ask for a free signature. Only the researcher can read a survey's decisions.</p></div>`)}
   const nr=reviews().filter(r=>r.sid===s.id).length;
-  const tabs=[['overview','Overview'],['queue','Review queue',nr],['log','Decision log'],['results','Results'],['questions','Questions'],['settings','Settings']];
+  const live=s.status==='live';if(S.stab==='share'&&!live)S.stab='overview';
+  const tabs=[['overview','Overview'],...(live?[['share','Share']]:[]),['queue','Review queue',nr],['log','Decision log'],['results','Results'],['questions','Questions'],['settings','Settings']];
   const clock=I.clock.replace('<svg','<svg style="width:15px;height:15px"');
   const meta=(s.status==='closed'?'<span>Closed</span>':s.ended?`<span>${clock} Deadline passed ${s.closesFull}</span>`:`<span>${clock} Closes ${s.closes} · ${s.left} left</span>`)+(s.paused&&s.status!=='closed'?' <span class="pill p-rev">New answers paused</span>':'');
-  const T={overview:sOverview,queue:sQueue,log:sLog,results:sResults,questions:sQuestions,settings:sSettings}[S.stab]||sOverview;
+  const T={overview:sOverview,share:sShare,queue:sQueue,log:sLog,results:sResults,questions:sQuestions,settings:sSettings}[S.stab]||sOverview;
   return header(crumb,esc(s.title),`<button class="btn" data-act="reopen">Refresh</button>${s.status==='live'?`<button class="btn dark" data-act="copyLink">${I.link}Copy share link</button>`:''}`)+
   `<div class="tabsrow"><div class="tabs" role="tablist">${tabs.map(([v,l,c])=>`<button role="tab" data-stab="${v}" aria-selected="${S.stab===v}">${l}${c?`<span class="cnt">${c}</span>`:''}</button>`).join('')}</div><div class="meta">${meta}</div></div>`+T(s,w);
 }
@@ -460,14 +460,17 @@ function vFund(s){const Q=B.quote(s,fundIn(s)),busy=FUNDL[S.busy]?S.busy:'',dis=
       <div class="tot"><span style="font-weight:600">You deposit</span><b id="sD">${Q.deposit}</b></div><p class="hint" id="sLo" style="margin:8px 0 0"${Q.leftover?'':' hidden'}>${Q.leftover?'Rounding keeps '+Q.leftover+' in your wallet.':''}</p><p class="hint" style="margin:8px 0 0">Paid in tBNB from ${S.wallet?shortW(S.wallet):'your wallet'}. The fee isn't refundable; unused budget is.</p>
       <button class="fundbtn" data-act="fund" ${busy?'disabled aria-busy="true"':''}><span class="fx">${fx}</span><span id="fundLbl">${busy?FUNDL[busy]:'Fund survey'+(Q.ok?' '+Q.deposit:'')}</span></button>
       <p class="fundnote">Opens MetaMask to approve and lock the budget in one step.</p></aside></div>`}
+/* Live & share: the step right after funding (F = the funding result), and later the Share tab (no F). */
 const shareLink=id=>(S.launched[id]&&S.launched[id].link)||`${location.origin}/s/${id}`;
-function vLiveShare(s){const F=S.launched[s.id];
-  return `<div class="lockbar">${I.lock}<span><b>Budget locked · ${F.deposit} in the contract</b><br><span style="font-size:13.5px">${F.budget} for answers and ${F.fee} fee. Your survey is live.</span></span><a class="mono" href="${F.txUrl}" target="_blank" rel="noopener">Tx ${F.tx}</a></div>
-  <div class="lockrow"><div>${I.lock}Rate<b>${s.rate} per answer</b></div><div>${I.lock}Quota<b>${s.quota} responses</b></div><div>${I.lock}Deadline<b>${s.closesFull}</b></div><div>${I.lock}Questions<b>${s.q.length} locked</b></div></div>
+function shareBody(s,F){const link=shareLink(s.id);
+  return (F?`<div class="lockbar">${I.lock}<span><b>Budget locked · ${F.deposit} in the contract</b><br><span style="font-size:13.5px">${F.budget} for answers and ${F.fee} fee. Your survey is live.</span></span><a class="mono" href="${F.txUrl}" target="_blank" rel="noopener">Tx ${F.tx}</a></div>
+  <div class="lockrow"><div>${I.lock}Rate<b>${s.rate} per answer</b></div><div>${I.lock}Quota<b>${s.quota} responses</b></div><div>${I.lock}Deadline<b>${s.closesFull}</b></div><div>${I.lock}Questions<b>${(s.q||[]).length} locked</b></div></div>`:'')+`
   <div class="share"><section class="card pad"><h2 class="h">Share the link</h2><p class="muted" style="margin:0">Respondents open it, sign in with their email and wallet, then answer.</p>
-      <div class="linkbox"><input class="inp" id="shareLink" readonly value="${esc(F.link)}" aria-label="Share link"><button class="btn dark" data-act="copyLink">${I.link}Copy</button></div>
-      <div class="row" style="margin-top:20px"><button class="btn" data-act="studentView">${I.eye}Preview as a respondent</button><button class="btn dark pill" data-act="toOverview">Go to overview ${I.arrow}</button></div></section>
-    <section class="card pad" style="text-align:center"><h2 class="h">QR code for printing</h2><div class="qrimg" role="img" aria-label="QR code for the survey link">${B.qrSvg(F.link)}</div><p class="hint" style="margin:0 0 12px">Scan it to open the survey. Print it or share it as an image.</p><button class="btn" data-act="qrDownload">${I.dl}Download QR code</button></section></div>`}
+      <div class="linkbox"><input class="inp" id="shareLink" readonly value="${esc(link)}" aria-label="Share link"><button class="btn dark" data-act="copyLink">${I.link}Copy</button></div>
+      <div class="row" style="margin-top:20px"><button class="btn" data-act="studentView">${I.eye}Preview as a respondent</button>${F?`<button class="btn dark pill" data-act="toOverview">Go to overview ${I.arrow}</button>`:''}</div></section>
+    <section class="card pad" style="text-align:center"><h2 class="h">QR code for printing</h2><div class="qrimg" role="img" aria-label="QR code for the survey link">${B.qrSvg(link)}</div><p class="hint" style="margin:0 0 12px">Scan it to open the survey. Print it or share it as an image.</p><button class="btn" data-act="qrDownload">${I.dl}Download QR code</button></section></div>`}
+function vLiveShare(s){return shareBody(s,S.launched[s.id])}
+function sShare(s){return shareBody(s,null)}
 
 /* ================= finance / results / settings / help ================= */
 const RESPILL={pay:['paid','Paid'],review:['pending','In review'],no:['notpaid','Not paid'],pending:['pending','Checking']};
@@ -575,7 +578,7 @@ function vSettings(){const M=me();
 function vHelp(){const f=[['How does screening decide who gets paid?','Code checks run first (empty, gibberish, duplicate, too fast, same option repeated). Then the AI labels each written answer twice. Published rules decide: Pay, Review or Don\'t pay. The AI can only send a response to Review; it can\'t block payment.'],
   ['What happens to a response in review?','It stays unpaid and shows in the survey\'s review queue with the reason. You pay it, or reject it with a reason. Either way it is recorded on chain and can\'t be undone. Nothing is paid or rejected by itself.'],
   ['What does the fee cover?','A flat fee per response ('+D.fee+') covers the network cost of each payment decision and running the screening. It isn\'t refunded when you close a survey; unused budget is.'],['Is this real money?','No. ResFunder runs on BSC Testnet with tBNB test tokens.']];
-  return header('','Help and support',`<a class="btn" href="${FLOWS}" target="_blank" rel="noopener">View user flows</a>`)+`<section class="card pad faq" style="max-width:820px">${f.map((x,i)=>`<details ${i?'':'open'}><summary>${x[0]}${I.down.replace('<svg','<svg style="width:16px;height:16px;flex:none"')}</summary><p>${x[1]}</p></details>`).join('')}</section>`}
+  return header('','Help and support','')+`<section class="card pad faq" style="max-width:820px">${f.map((x,i)=>`<details ${i?'':'open'}><summary>${x[0]}${I.down.replace('<svg','<svg style="width:16px;height:16px;flex:none"')}</summary><p>${x[1]}</p></details>`).join('')}</section>`}
 /* ================= student view (respondent page) ================= */
 /* Three screens, like a form: (1) intro and consent, (2) every question on one page with Submit at the end,
    (3) the result. A "ticket" anchors each screen: what the survey pays and how far along you are; at the end it is the receipt.
@@ -713,7 +716,7 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'newFund':newDraft();break;
     case 'delDraft':{const id=el.dataset.id,d=SV(id);if(!d||d.status!=='draft')break;const at=SURVEYS.indexOf(d);SURVEYS.splice(at,1);saveDrafts();render();
       toast('Draft deleted',()=>{SURVEYS.splice(Math.min(at,SURVEYS.length),0,d);saveDrafts();render();toast('Draft restored')});break;}
-    case 'qrDownload':{const F=S.launched[S.sid];if(!F)break;const url=URL.createObjectURL(new Blob([B.qrSvg(F.link)],{type:'image/svg+xml'})),a=document.createElement('a');
+    case 'qrDownload':{if(!SV(S.sid))break;const url=URL.createObjectURL(new Blob([B.qrSvg(shareLink(S.sid))],{type:'image/svg+xml'})),a=document.createElement('a');
       a.href=url;a.download=`${(SV(S.sid)||{}).code||'survey'}-qr.svg`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);break;}
     case 'copyLink':copy(shareLink(S.sid),'Share link copied');break;
     case 'copyAddr':copy(S.wallet,'Address copied');break;
