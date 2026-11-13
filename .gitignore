@@ -27,3 +27,4 @@ contracts/deployments/localhost.json
 coverage/
 build/
 .vercel
+.neon
