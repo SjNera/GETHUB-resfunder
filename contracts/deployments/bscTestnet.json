@@ -1,0 +1,16 @@
+{
+  "network": "bscTestnet",
+  "chainId": 97,
+  "address": "0x31F3E8161d4626BB932e0E3A3A9e53BC47688751",
+  "deployTxHash": "0x1fff8e7de98602458020b6b57d6e3a0a762ccc4d2154247b903dc3a7f63aab81",
+  "blockNumber": 142430760,
+  "constructorArgs": {
+    "agent": "0xA9E8986712c0b6784Ff5ad7c0a2FB13396561624",
+    "platform": "0x346b021Feeb931A7Ddbc226d5df5e9eA4cD0a09d",
+    "gasPerResponse": "18390000000000",
+    "minProfitPerResponse": "20000000000000"
+  },
+  "deployedAt": "2026-11-13T04:48:18.000Z",
+  "deployedWith": "Remix + MetaMask (solc 0.8.28, optimizer 200 runs, EVM cancun)",
+  "deployer": "0xa387e38423a808236f7ee06bf6fc6dfaa70d499b"
+}
