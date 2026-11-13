@@ -51,16 +51,15 @@ const me=()=>{const email=S.auth.email||'',name=email.split('@')[0].split(/[._-]
 const S={boot:true,authed:false,landing:true,wallet:'',after:null,want:'',auth:{stage:'email',email:'',wallet:false,pf:null},
   page:'dashboard',sid:'',stab:'overview',finsub:'wallet',answered:{},sideOpen:false,
   draft:{},launched:{},closeAsk:false,closeErr:'',busy:'',fundErr:'',
-  openRev:null,qQ:'',reasonFor:null,reason:'',dbusy:'',derr:'',apl:null,
+  openRev:null,qQ:'',reasonFor:null,reason:'',dbusy:'',derr:'',
   range:'week',day:null,chart:null,pace:0,lQ:'',lRes:'all',lSel:new Set(),fOpen:false,rq:{},fsub:'all',rv:'all',ri:0,jLink:'',
   sv:null};
 
 /* A survey opened from the server: {survey, log, results} */
 const W=id=>D.ws[id];
 /* Responses waiting in Review, from the surveys opened so far. Each survey's log needs its own signature. */
-/* What needs the researcher: responses in review, and open appeals on a rejection. */
-const reviews=()=>Object.values(D.ws).flatMap(w=>{const ap={};(w.appeals||[]).forEach(a=>{ap[a.responseId]=a});
-  return w.log.rows.filter(r=>r.res==='review'||(ap[r.key]&&ap[r.key].status==='open')).map(r=>({...r,sid:w.survey.id,stitle:w.survey.title,kind:r.res==='review'?'review':'appeal',appealText:ap[r.key]?ap[r.key].text:''}))});
+/* What needs the researcher: the responses in review. */
+const reviews=()=>Object.values(D.ws).flatMap(w=>w.log.rows.filter(r=>r.res==='review').map(r=>({...r,sid:w.survey.id,stitle:w.survey.title})));
 const revRow=key=>reviews().find(r=>r.key===key);
 
 /* ================= loading from the server ================= */
@@ -116,7 +115,7 @@ function render(){
   const P={dashboard:vDashboard,surveys:vSurveys,survey:vSurvey,answer:vAnswer,finance:vFinance,settings:vSettings,help:vHelp}[S.page]||vDashboard;
   root.innerHTML=`<div class="shell"><aside class="side ${S.sideOpen?'open':''}" aria-label="Sidebar">${sideNav()}</aside><div class="scrimSide ${S.sideOpen?'open':''}" data-act="sideClose"></div><main class="main">${P()}</main></div>`;
   document.getElementById('drawerRoot').innerHTML=S.openRev?reviewPanel():'';
-  document.getElementById('modalRoot').innerHTML=S.closeAsk?closeModal():S.apl?appealModal():'';
+  document.getElementById('modalRoot').innerHTML=S.closeAsk?closeModal():'';
   document.getElementById('svRoot').innerHTML=S.sv?vStudent():'';
   try{const h=hashOf();if(location.hash!=='#'+h)history.replaceState(null,'','#'+h)}catch(e){}
 }
@@ -330,13 +329,13 @@ function sOverview(s,w){const m=w.log.sum,closed=s.status==='closed';
     ${kpi(I.clock,closed?'Closed':s.left,'','',closed?'This survey is closed':s.ended?'Deadline passed '+s.closesFull:'Left · closes '+s.closesFull)}</div>
     <div class="card chartc" id="chartCard">${chartCard()}</div>`;
 }
-/* Review queue (survey tab): responses in review and open appeals. A person decides; the AI never does. */
+/* Review queue (survey tab): responses in review. A person decides; the AI never does. */
 const ansText=(q,a)=>a==null||a===''?'':q.type==='mc'?(q.opts[a]||''):String(a);
 function qRows(){const q=S.qQ.trim().toLowerCase();return reviews().filter(r=>r.sid===S.sid&&(!q||(r.rid+' '+r.wallet+' '+r.why).toLowerCase().includes(q)))}
 function queueTable(){const rows=qRows();
   if(!rows.length)return reviews().some(r=>r.sid===S.sid)?`<div class="card empty"><p>No responses match your search.</p><button class="btn" data-act="qClear">Clear search</button></div>`
-    :`<div class="card empty"><h3>All caught up</h3><p>Responses the checks can't settle, and appeals, show up here.</p><button class="btn" data-stab="log">See decisions</button></div>`;
-  const tr=r=>`<tr><td><div class="nm"><b>${r.rid}</b><small>${r.w}</small></div></td><td>${esc(r.kind==='appeal'?'Appeal: '+r.why:r.why)}</td><td><span class="tp ${r.kind}">${r.kind==='appeal'?'Appeal':'Review'}</span></td><td class="muted">${r.when}</td>
+    :`<div class="card empty"><h3>All caught up</h3><p>Responses the checks can't settle show up here.</p><button class="btn" data-stab="log">See decisions</button></div>`;
+  const tr=r=>`<tr><td><div class="nm"><b>${r.rid}</b><small>${r.w}</small></div></td><td>${esc(r.why)}</td><td><span class="tp review">Review</span></td><td class="muted">${r.when}</td>
     <td><span class="tp pending">Pending</span></td><td class="act"><button class="rvbtn" data-openrev="${r.key}">Review</button></td></tr>`;
   return `<div class="tbox"><table class="t"><thead><tr><th>Response</th><th>Reason</th><th>Type</th><th>Submitted</th><th>Status</th><th class="act">Action</th></tr></thead><tbody>${rows.map(tr).join('')}</tbody></table></div>
     <div class="tfoot"><span>Showing ${rows.length} · they stay unpaid until you decide</span></div>`;
@@ -346,30 +345,27 @@ function sQueue(){
     <div id="qBody">${queueTable()}</div>`}
 /* Review drawer: the answers, the reasons, and the decision. */
 function decideFoot(r,w){const rate=w.survey.rate,busy=S.dbusy,err=S.derr?`<div class="err" role="alert" style="margin-bottom:8px">${esc(S.derr)}</div>`:'';
-  if(busy)return `<p class="rd-ask rd-ask-sm">${busy==='pay'?'Sending the payment. This can take a few seconds.':'Saving your decision…'}</p><div class="rd-two"><button class="btn" disabled>Please wait</button></div>`;
-  if(S.reasonFor===r.key)return `${err}<p class="rd-ask">Why aren't you paying?<small>The respondent sees this reason and can appeal once.</small></p>
+  if(busy)return `<p class="rd-ask rd-ask-sm">${busy==='pay'?'Sending the payment. This can take a few seconds.':'Recording your decision on chain. This can take a few seconds.'}</p><div class="rd-two"><button class="btn" disabled>Please wait</button></div>`;
+  if(S.reasonFor===r.key)return `${err}<p class="rd-ask">Why aren't you paying?<small>The respondent sees this reason. It is recorded on chain and can't be undone.</small></p>
     <div class="rd-reasons" role="radiogroup" aria-label="Reason">${B.rejectReasons.map(([c,t])=>`<label class="pf-pill" data-reason="${c}"><input type="radio" name="rd-reason" ${c===S.reason?'checked':''}><span>${esc(t)}</span></label>`).join('')}</div>
     <div class="rd-two"><button class="btn" data-act="cancelNo">Cancel</button><button class="btn red" data-act="decide" data-d="dont_pay" data-id="${r.key}">${I.x}Don't pay</button></div>`;
-  if(r.kind==='appeal')return `${err}<p class="rd-ask">Pay this respondent after all?<small>Your decision on an appeal is final.</small></p>
-    <div class="rd-two"><button class="btn" data-act="decide" data-d="dont_pay" data-id="${r.key}">Keep unpaid</button><button class="btn dark" data-act="decide" data-d="pay" data-id="${r.key}">${I.check}Pay ${rate}</button></div>`;
-  return `${err}<p class="rd-ask rd-ask-sm">It stays unpaid until you decide. Paying sends ${rate} from the contract to the respondent.</p>
+  return `${err}<p class="rd-ask rd-ask-sm">It stays unpaid until you decide. Paying sends ${rate} from the contract to the respondent. Either decision is recorded on chain and can't be undone.</p>
     <div class="rd-two"><button class="btn rd-no" data-act="askNo" data-id="${r.key}">${I.x}Don't pay</button><button class="btn dark" data-act="decide" data-d="pay" data-id="${r.key}">${I.check}Pay ${rate}</button></div>`}
 function reviewPanel(){const r=revRow(S.openRev);if(!r)return '';const w=W(r.sid),Q=w.survey.q,P=reviews(),i=P.findIndex(x=>x.key===r.key);
-  const fo=Q.findIndex(q=>q.type==='open'),k=fo<0?0:fo,appeal=r.kind==='appeal';
+  const fo=Q.findIndex(q=>q.type==='open'),k=fo<0?0:fo;
   const qa=j=>{const t=ansText(Q[j],r.a[j]);return `<div class="rd-oa"><dt>${j+1}. ${esc(Q[j].t)}</dt><dd class="${t?'':'none'}">${t?esc(t):'No answer'}</dd></div>`};
   const first=ansText(Q[k],r.a[k]);
   return `<div class="backdrop" data-act="closeRev"></div><aside class="drawer rd" role="dialog" aria-modal="true" aria-labelledby="rdTitle">
     <div class="rd-top"><button class="ibtn" data-step="-1" aria-label="Previous response" ${i<=0?'disabled':''}>${I.chevL}</button><span class="rd-count">${i+1} of ${P.length}</span><button class="ibtn" data-step="1" aria-label="Next response" ${i>=P.length-1?'disabled':''}>${I.chev}</button><span class="sp"></span><button class="ibtn" data-act="closeRev" aria-label="Close review">${I.x}</button></div>
     <div class="rd-body">
-      <div class="rd-head"><span class="rd-tile">${I.flag}</span><div><h2 id="rdTitle">${appeal?'Appeal':'Sent to review'}</h2>
-        <div class="rd-meta"><span class="mono">${r.rid}</span><span class="rd-pill ${appeal?'accent':'warn'}">${appeal?'Appeal':'Needs review'}</span></div></div></div>
+      <div class="rd-head"><span class="rd-tile">${I.flag}</span><div><h2 id="rdTitle">Sent to review</h2>
+        <div class="rd-meta"><span class="mono">${r.rid}</span><span class="rd-pill warn">Needs review</span></div></div></div>
       <p class="rd-desc">Submitted ${r.when}.</p>
-      ${appeal?`<section class="rd-sec"><h3>${I.mail}The respondent wrote</h3><blockquote class="rd-quote">${esc(r.appealText)}</blockquote></section>`:''}
       <section class="rd-sec"><h3>${I.doc}Question ${k+1} of ${Q.length}</h3><p class="rd-qt">${esc(Q[k].t)}</p><blockquote class="rd-quote">${first?esc(first):'<span class="rd-muted">No answer</span>'}</blockquote></section>
       <section class="rd-sec"><h3>${I.shield}Screening</h3>
         ${(r.reasons.length?r.reasons:[r.why]).map(x=>`<div class="rd-call warn" style="padding:10px 12px;display:flex;gap:8px;align-items:flex-start">${I.flag.replace('<svg','<svg style="width:15px;height:15px;flex:none;margin-top:3px"')}<span>${esc(x)}</span></div>`).join('')}</section>
       <div class="rd-card"><dl>
-        <div><dt>Why it's here</dt><dd>${appeal?'You rejected this answer and the respondent appealed. Your decision now is final.':'The AI label can only send a response to review. It can\'t pay or block by itself.'}</dd></div>
+        <div><dt>Why it's here</dt><dd>The AI label can only send a response to review. It can\'t pay or block by itself.</dd></div>
         <div><dt>Survey</dt><dd>${esc(w.survey.title)}</dd></div>
         <div><dt>Wallet</dt><dd class="rd-w"><span class="mono">${r.w}</span><button class="ibtn" data-act="copyW" data-w="${r.wallet}" aria-label="Copy wallet address">${I.link}</button></dd></div>
       </dl>
@@ -422,11 +418,6 @@ function sSettings(s,w){const live=s.status==='live',m=w.log.sum;
     <section class="card pad"><h2 class="h">Controls</h2>
       <div class="srow"><span><b>Pause new answers</b><small>Stops new submissions until you turn it back on. Answers already sent are still checked and paid.</small></span><label class="switch"><input type="checkbox" data-pause="${s.id}" ${s.paused?'checked':''} ${live&&!S.busy?'':'disabled'} aria-label="Pause new answers"><span></span></label></div>
       <div class="srow"><span><b>Close survey and refund</b><small>${live?'Stops new responses and returns the unused budget to your wallet.':'This survey is closed.'+(m.refunded?' '+m.refunded+' came back to your wallet.':'')}</small></span>${live?`<button class="btn red" data-act="askClose">${I.refund}Close survey</button>`:''}</div></section></div>`}
-function appealModal(){const A=S.apl,h=(D.hist?D.hist.rows:[]).find(x=>x.key===A.key)||{title:'',why:''};
-  return `<div class="modal" role="dialog" aria-modal="true" aria-label="Appeal"><div class="scr" data-act="apCancel"></div><div class="mm"><div class="hd"><span class="fx">${I.send}</span>Appeal this decision</div>
-    <div class="bd"><p class="muted" style="margin:0 0 12px"><b>${esc(h.title)}</b><br>${esc(h.why)}</p><div class="fld"><label for="apT">Why should your answer count?</label><textarea class="inp" id="apT" data-apt="1" rows="5" maxlength="300" ${A.busy?'disabled':''}>${esc(A.text)}</textarea><div class="cnt2" id="apCnt">${A.text.length} / 300</div></div>
-      <p class="hint" style="margin:8px 0 0">You can appeal once. The researcher's decision on an appeal is final.</p><div class="err" id="apErr" role="alert">${esc(A.err)}</div></div>
-    <div class="ft"><button class="btn" data-act="apCancel" ${A.busy?'disabled':''}>Cancel</button><button class="btn dark" data-act="apSend" ${A.busy?'disabled aria-busy="true"':''}>${A.busy?'Sending…':'Send appeal'}</button></div></div></div>`}
 function closeModal(){const w=W(S.sid),m=w.log.sum,busy=S.busy;
   const lbl={confirm:'Confirm in MetaMask…',mining:'Waiting for the network…',registering:'Recording the refund…'}[busy]||'Close and refund';
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="Close survey"><div class="scr" data-act="cancelClose"></div><div class="mm"><div class="hd"><span class="fx">${I.refund}</span>Close this survey?</div>
@@ -474,7 +465,7 @@ function vLiveShare(s){const F=S.launched[s.id];
 const RESPILL={pay:['paid','Paid'],review:['pending','In review'],no:['notpaid','Not paid'],pending:['pending','Checking']};
 const histBlock=(none)=>D.histErr?`<div class="card empty"><h3>Couldn't load your answers</h3><p>${esc(D.histErr)}</p><button class="btn dark" data-act="reloadHist">Try again</button></div>`
   :!D.hist?`<div class="card empty"><h3>Loading your answers</h3></div>`
-  :D.hist.rows.length?`<div class="tbox"><table class="t"><thead><tr><th>Survey</th><th>Amount</th><th>Status</th><th>Transaction</th><th>When</th></tr></thead><tbody>${D.hist.rows.map(p=>`<tr><td><div class="nm"><b style="font-weight:500">${esc(p.title)}</b><small>${p.code}</small></div></td><td>${p.amount}</td><td><span class="tp ${RESPILL[p.res][0]}">${RESPILL[p.res][1]}</span>${p.res==='no'||p.res==='review'?`<div class="hint" style="margin-top:4px">${esc(p.why)}</div>`:''}${p.canAppeal?`<button class="btn" style="margin-top:8px" data-act="apOpen" data-id="${p.key}">${I.send}Appeal</button>`:''}${p.appeal==='open'?'<div class="hint" style="margin-top:6px">Appeal sent · waiting for the researcher</div>':p.appeal==='kept'?'<div class="hint" style="margin-top:6px">Appeal rejected · final</div>':p.appeal==='paid'?'<div class="hint" style="margin-top:6px">Appeal accepted</div>':''}</td><td class="mono">${p.txUrl?`<a href="${p.txUrl}" target="_blank" rel="noopener">${p.tx}</a>`:'<span class="muted">—</span>'}</td><td class="muted">${p.when}</td></tr>`).join('')}</tbody></table></div><div class="tfoot"><span>${D.hist.rows.length} answer${D.hist.rows.length===1?'':'s'} · ${D.hist.earned} earned</span></div>`
+  :D.hist.rows.length?`<div class="tbox"><table class="t"><thead><tr><th>Survey</th><th>Amount</th><th>Status</th><th>Transaction</th><th>When</th></tr></thead><tbody>${D.hist.rows.map(p=>`<tr><td><div class="nm"><b style="font-weight:500">${esc(p.title)}</b><small>${p.code}</small></div></td><td>${p.amount}</td><td><span class="tp ${RESPILL[p.res][0]}">${RESPILL[p.res][1]}</span>${p.res==='no'||p.res==='review'?`<div class="hint" style="margin-top:4px">${esc(p.why)}</div>`:''}</td><td class="mono">${p.txUrl?`<a href="${p.txUrl}" target="_blank" rel="noopener">${p.tx}</a>`:'<span class="muted">—</span>'}</td><td class="muted">${p.when}</td></tr>`).join('')}</tbody></table></div><div class="tfoot"><span>${D.hist.rows.length} answer${D.hist.rows.length===1?'':'s'} · ${D.hist.earned} earned</span></div>`
   :`<p class="muted sect-e">${none}</p>`;
 function vFinance(){const t=S.finsub,names={wallet:'Wallet',payouts:'Payouts',refunds:'Refunds'},role={wallet:'',payouts:'As a respondent',refunds:'As a researcher'};
   const tabs=`<div class="tabsrow"><div class="tabs fit" role="tablist" aria-label="Finance">${Object.entries(names).map(([v,l])=>`<button role="tab" data-nav="finance-${v}" aria-selected="${t===v}">${l}</button>`).join('')}</div>${role[t]?`<div class="meta">${role[t]}</div>`:''}</div>`;
@@ -573,9 +564,9 @@ function vSettings(){const M=me();
   return header('','Settings','')+`<div class="g2"><section class="card pad"><h2 class="h">Account</h2><p class="muted" style="margin:0 0 16px">You can publish surveys as a researcher and answer other groups' surveys as a respondent.</p>
       <dl class="kv"><dt>Name</dt><dd>${esc(M.name)}</dd><dt>Email</dt><dd>${esc(M.email)}</dd><dt>Wallet</dt><dd class="mono">${S.wallet?shortW(S.wallet):'—'}</dd><dt>Network</dt><dd>BSC Testnet</dd></dl>
       <div class="srow" style="margin-top:16px;border-top:1px solid var(--line)"><span><b>Sign out</b><small>${esc(M.email)}</small></span><button class="btn" data-act="signOut" ${S.busy==='out'?'disabled':''}>Sign out</button></div></section>
-    <section class="card pad"><h2 class="h">Email</h2><p class="muted" style="margin:0 0 12px">ResFunder doesn't send email. Your email is a label on your account, and it isn't verified. Results, reviews and appeals are in this dashboard.</p></section></div>`}
+    <section class="card pad"><h2 class="h">Email</h2><p class="muted" style="margin:0 0 12px">ResFunder doesn't send email. Your email is a label on your account, and it isn't verified. Results and reviews are in this dashboard.</p></section></div>`}
 function vHelp(){const f=[['How does screening decide who gets paid?','Code checks run first (empty, gibberish, duplicate, too fast, same option repeated). Then the AI labels each written answer twice. Published rules decide: Pay, Review or Don\'t pay. The AI can only send a response to Review; it can\'t block payment.'],
-  ['What happens to a response in review?','It stays unpaid and shows in the survey\'s review queue with the reason. You pay it, or reject it with a reason. Nothing is paid or rejected by itself.'],['Can a respondent appeal?','Yes, once, after you reject a response in review. You decide the appeal and that decision is final. An answer blocked by a code check, like an empty answer, is already on chain and can\'t be appealed.'],
+  ['What happens to a response in review?','It stays unpaid and shows in the survey\'s review queue with the reason. You pay it, or reject it with a reason. Either way it is recorded on chain and can\'t be undone. Nothing is paid or rejected by itself.'],
   ['What does the fee cover?','A flat fee per response ('+D.fee+') covers the network cost of each payment decision and running the screening. It isn\'t refunded when you close a survey; unused budget is.'],['Is this real money?','No. ResFunder runs on BSC Testnet with tBNB test tokens.']];
   return header('','Help and support',`<a class="btn" href="${FLOWS}" target="_blank" rel="noopener">View user flows</a>`)+`<section class="card pad faq" style="max-width:820px">${f.map((x,i)=>`<details ${i?'':'open'}><summary>${x[0]}${I.down.replace('<svg','<svg style="width:16px;height:16px;flex:none"')}</summary><p>${x[1]}</p></details>`).join('')}</section>`}
 /* ================= student view (respondent phone) ================= */
@@ -618,16 +609,14 @@ function vStudent(){const R=S.sv,s=R.s,Q=s.q;let ph='';
   else if(step==='review')ph=R.res?phone(`<div class="res"><div class="icirc ic-rev">${I.clock}</div><h2 class="ph1">Under review</h2><p class="pp">The researcher will decide.</p><div class="rbox"><ol class="tln"><li class="ok"><span class="d"></span><span><b>Submitted</b><small>Your answers were received</small></span></li><li class="now"><span class="d"></span><span><b>In review</b><small>The checks couldn't settle one answer</small></span></li><li><span class="d"></span><span><b>Decision</b><small>Made by the researcher</small></span></li></ol></div></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`)
     :phone(`<div class="res"><div class="icirc ic-rev">${I.clock}</div><h2 class="ph1">Under review</h2><p class="pp">One answer was flagged, so the researcher will decide.</p><div class="rbox"><ol class="tln"><li class="ok"><span class="d"></span><span><b>Submitted</b><small>Your answers were received</small></span></li><li class="now"><span class="d"></span><span><b>In review</b><small>A researcher is checking your answer</small></span></li><li><span class="d"></span><span><b>Decision</b><small>Made by the researcher</small></span></li></ol></div></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);
   else if(step==='nopay'){
-    if(R.res)ph=phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Not paid</h2><p class="pp">Your answers didn't pass the code checks.</p><div class="rbox">${(R.res.reasons.length?R.res.reasons:['A code check failed.']).map(x=>`<div class="quote" style="border-color:var(--line-2)">${esc(x)}</div>`).join('')}</div><p class="hint" style="margin-top:12px">This decision is recorded on chain, so it can't be appealed.</p></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);
-    else if(R.appeal==='sent')ph=phone(`<div class="res"><div class="icirc ic-or">${I.send}</div><h2 class="ph1">Appeal sent</h2><p class="pp">The researchers will look again. Their decision is final.</p></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);
-    else if(R.appeal==='form')ph=phone(`<h2 class="ph1">Appeal this decision</h2><p class="pp">Tell the researchers why your answer should count. You can appeal once.</p><div class="fld"><label for="rAp">Your reason</label><textarea class="inp" id="rAp" data-rin="appealText" rows="6" maxlength="300" placeholder="My answer was about…">${esc(R.appealText)}</textarea><div class="cnt2" id="rApCnt">${R.appealText.length} / 300</div><div class="err" id="rApErr"></div></div>`,`<button class="btn dark block" data-ract="sendAppeal">Send appeal</button><button class="btn ghost" data-ract="cancelAppeal">Cancel</button>`);
+    if(R.res)ph=phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Not paid</h2><p class="pp">Your answers didn't pass the code checks.</p><div class="rbox">${(R.res.reasons.length?R.res.reasons:['A code check failed.']).map(x=>`<div class="quote" style="border-color:var(--line-2)">${esc(x)}</div>`).join('')}</div><p class="hint" style="margin-top:12px">This decision is recorded on chain.</p></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);
     else{const qi=Math.max(0,Q.findIndex(isText)),a=((R.ans[qi]||'')+'').trim()||'asdf';
-      ph=phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Not paid</h2><p class="pp">Your answer to question ${qi+1} didn't pass a code check.</p><div class="rbox"><div class="hint">${esc(Q[qi].t)}</div><div class="quote" style="border-color:var(--line-2)">“${esc(a)}”</div></div><p class="hint" style="margin-top:12px">This is a preview. If the researcher rejects an answer after review, the respondent can appeal once.</p></div>`,`<button class="btn dark block" data-ract="openAppeal">Appeal</button><button class="btn ghost" data-ract="restart">Done</button>`);}}
+      ph=phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Not paid</h2><p class="pp">Your answer to question ${qi+1} didn't pass a code check.</p><div class="rbox"><div class="hint">${esc(Q[qi].t)}</div><div class="quote" style="border-color:var(--line-2)">“${esc(a)}”</div></div><p class="hint" style="margin-top:12px">This is a preview. A respondent also sees this screen when the researcher rejects an answer after review.</p></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);}}
   const label=R.live?'Answering as a respondent · '+esc(me().email):'Preview · what respondents see · nothing is sent';
   return `<div class="sv" role="dialog" aria-modal="true" aria-label="Respondent view"><div class="scr" data-act="closeSV"></div><div class="hdr">${I.eye.replace('<svg','<svg style="width:16px;height:16px"')}<span>${label}</span><button class="ibtn" data-act="closeSV" aria-label="Close respondent view">${I.x}</button></div>${ph}</div>`}
 let timers=[];const clearT=()=>{timers.forEach(clearTimeout);timers=[]};
 function runScreen(){clearT();const tick=()=>{if(!S.sv||S.sv.step!=='screen')return;S.sv.stage++;render();if(S.sv.stage<3)timers.push(setTimeout(tick,900));else timers.push(setTimeout(()=>{if(S.sv&&S.sv.step==='screen')rgo(S.sv.outcome)},900))};timers.push(setTimeout(tick,900))}
-function rgo(step){const R=S.sv;R.step=step;if(step==='screen'){R.stage=0;runScreen()}else clearT();if(step==='nopay'&&R.appeal!=='sent')R.appeal='idle';
+function rgo(step){const R=S.sv;R.step=step;if(step==='screen'){R.stage=0;runScreen()}else clearT();
   render()}
 /* The real submission: one signature, the answers, then the server's screening and its decision. */
 function submitLive(){const R=S.sv;if(R.sending)return;R.sending=true;R.step='screen';R.err='';R.phase='sign';clearT();render();
@@ -635,7 +624,7 @@ function submitLive(){const R=S.sv;if(R.sending)return;R.sending=true;R.step='sc
       if(S.sv===R){R.step=res.step;render()}else toast(res.step==='pay'?`${res.amount} sent to your wallet`:res.step==='review'?'Your answers are under review':'Your answers were not paid');
       loadBalance();loadHist()},
     e=>{R.sending=false;R.err=B.text(e);if(S.sv===R)render();else toast(R.err)})}
-const newSV=(sid,live)=>({sid,live:!!live,s:null,step:'intro',email:live?me().email:'',verified:false,agree:false,qi:0,ans:{},wallet:live?S.wallet:'',stage:0,outcome:'pay',appeal:'idle',appealText:'',res:null,err:'',phase:''});
+const newSV=(sid,live)=>({sid,live:!!live,s:null,step:'intro',email:live?me().email:'',verified:false,agree:false,qi:0,ans:{},wallet:live?S.wallet:'',stage:0,outcome:'pay',res:null,err:'',phase:''});
 /* ================= actions ================= */
 let tt,lastUndo=null;
 function toast(m,undo){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;document.getElementById('toastUndo').hidden=!undo;lastUndo=undo||null;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4000)}
@@ -698,17 +687,11 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'cancelNo':S.reasonFor=null;render();break;
     case 'decide':{if(S.dbusy)return;const key=el.dataset.id,dd=el.dataset.d,r=revRow(key);if(!r)break;const w=W(r.sid);
       S.dbusy=dd==='pay'?'pay':'no';S.derr='';render();
-      B.decide(key,dd,dd==='dont_pay'&&r.kind==='review'?S.reason:undefined).then(async res=>{await loadWs(r.sid,true);
+      B.decide(key,dd,dd==='dont_pay'?S.reason:undefined).then(async res=>{await loadWs(r.sid,true);
           S.dbusy='';S.reasonFor=null;const P=reviews();S.openRev=P.length?(P.find(x=>x.key!==key)||P[0]).key:null;render();
-          toast(dd==='pay'?(res.status==='paid'?`Paid ${w.survey.rate}`:"The payment didn't go through. It is back in review."):r.kind==='appeal'?'Kept unpaid. The decision is final.':'Not paid. The respondent can appeal once.');
+          toast(dd==='pay'?(res.status==='paid'?`Paid ${w.survey.rate}`:"The payment didn't go through. It is back in review."):(res.status==='blocked'?'Not paid. The decision is recorded on chain.':"The decision didn't go through. It is back in review."));
           if(dd==='pay')loadBalance()},
         e=>{S.dbusy='';S.derr=B.text(e);render()});break;}
-    case 'apOpen':S.apl={key:el.dataset.id,text:'',busy:false,err:''};render();{const t=document.getElementById('apT');if(t)t.focus()}break;
-    case 'apCancel':if(S.apl&&S.apl.busy)return;S.apl=null;render();break;
-    case 'apSend':{const A=S.apl;if(!A||A.busy)return;const t=A.text.trim(),c=B.appealChars;
-      if(t.length<c.min)return setErr('apErr',`Write at least ${c.min} characters.`);if(t.length>c.max)return setErr('apErr',`Keep it under ${c.max} characters.`);
-      A.busy=true;A.err='';render();
-      B.appeal(A.key,t).then(()=>{S.apl=null;render();toast('Appeal sent. The researcher will decide.');loadHist()},e=>{A.busy=false;A.err=B.text(e);render()});break;}
     case 'qClear':S.qQ='';render();break;
     case 'fToggle':S.fOpen=!S.fOpen;render();break;
     case 'lClear':S.lQ='';S.lRes='all';render();break;
@@ -726,12 +709,9 @@ function ract(a){const R=S.sv,Q=R.s.q;
     case 'demoW':R.wallet=DEMO_WALLET;render();break;
     case 'submit':if(R.live){submitLive();break}
       if(!/^0x[0-9a-fA-F]{40}$/.test((R.wallet||'').trim()))return setErr('rWErr','Enter a full wallet address (0x followed by 40 characters).');rgo('screen');break;
-    case 'openAppeal':R.appeal='form';render();break;
-    case 'cancelAppeal':R.appeal='idle';render();break;
-    case 'sendAppeal':if(R.appealText.trim().length<10)return setErr('rApErr','Write at least a short sentence (10 characters).');R.appeal='sent';render();break;
     case 'restart':clearT();
       if(R.live){const st=R.res&&R.res.step;S.sv=null;render();toast(st==='pay'?`${R.res.amount} sent to your wallet`:st==='review'?'Thanks. Your answers are under review.':'Thanks for answering');break}
-      Object.assign(R,{step:'intro',email:'',verified:false,agree:false,qi:0,ans:{},wallet:'',stage:0,appeal:'idle',appealText:''});render();break;
+      Object.assign(R,{step:'intro',email:'',verified:false,agree:false,qi:0,ans:{},wallet:'',stage:0});render();break;
   }}
 
 document.addEventListener('click',e=>{
@@ -779,8 +759,7 @@ document.addEventListener('input',e=>{const t=e.target,d=t.dataset;if(!d)return;
   if(d.fin){s[d.fin]=t.value;saveDrafts();refreshFund();return}
   if(d.bq!=null){s.q[+d.bq].t=t.value;refreshPrev();saveDrafts();return}
   if(d.bopt!=null){s.q[+d.bopt].opts[+d.j]=t.value;refreshPrev();saveDrafts();return}
-  if(d.apt){if(S.apl){S.apl.text=t.value;const c=document.getElementById('apCnt');if(c)c.textContent=t.value.length+' / 300';setErr('apErr','')}return}
-  if(d.rin){S.sv[d.rin]=t.value;if(d.rin==='appealText'){const c=document.getElementById('rApCnt');if(c)c.textContent=t.value.length+' / 300'}['rEmailErr','rWErr','rApErr'].forEach(x=>setErr(x,''));return}
+  if(d.rin){S.sv[d.rin]=t.value;['rEmailErr','rWErr'].forEach(x=>setErr(x,''));return}
   if(d.ranst!=null){S.sv.ans[+d.ranst]=t.value;setErr('rAnsErr','');return}
 });
 document.addEventListener('change',e=>{const el=e.target,d=el.dataset;if(!d)return;const s=SV(S.sid);
@@ -801,7 +780,7 @@ document.addEventListener('change',e=>{const el=e.target,d=el.dataset;if(!d)retu
 });
 document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.col');if(!c)return;const i=+c.dataset.day;if(i===S.day)return;S.day=i;refreshPlot()});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){if(S.closeAsk){if(!S.busy){S.closeAsk=false;render()}}else if(S.apl){if(!S.apl.busy){S.apl=null;render()}}else if(S.sv){clearT();S.sv=null;render()}else if(S.openRev){S.openRev=null;render()}else if(S.fOpen){S.fOpen=false;render()}else if(S.sideOpen){S.sideOpen=false;render()}return}
+  if(e.key==='Escape'){if(S.closeAsk){if(!S.busy){S.closeAsk=false;render()}}else if(S.sv){clearT();S.sv=null;render()}else if(S.openRev){S.openRev=null;render()}else if(S.fOpen){S.fOpen=false;render()}else if(S.sideOpen){S.sideOpen=false;render()}return}
   if(e.key==='Enter'&&e.target.matches&&e.target.matches('input.inp,#jLink')){const m={aEmail:'authEmail',jLink:'openLink'}[e.target.id];if(m){e.preventDefault();act(m)}}
 });
 function fromHash(){const h=(location.hash||'').slice(1);if(!h||!S.authed)return;if(h.startsWith('survey-')){const [,sid,tab]=h.split('-');if(SV(sid)&&!(S.page==='survey'&&S.sid===sid&&S.stab===(tab||S.stab)))openSurvey(sid,tab)}else if(/^(dashboard|surveys|answer|settings|help)$/.test(h))S.page=h;else if(/^finance-(wallet|payouts|refunds)$/.test(h)){S.page='finance';S.finsub=h.slice(8)}}

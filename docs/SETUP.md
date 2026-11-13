@@ -20,7 +20,7 @@ Set `BETTER_AUTH_URL` to the address the browser uses (`http://localhost:3000` i
 ```bash
 npm run db:apply        # surveys, responses, decisions (lib/db/schema.sql)
 npm run db:apply:auth   # Better Auth tables (lib/db/auth-schema.sql)
-npm run db:apply:app    # appeals and profiles (lib/db/app-schema.sql)
+npm run db:apply:app    # profiles (lib/db/app-schema.sql)
 npm run auth:smoke      # nonce -> SIWE signature -> session -> sign-out, with a throwaway key
 npm run db:smoke        # one row per table
 ```
@@ -70,10 +70,10 @@ npm run e2e                # full run: deployed contract, real screening
 - Email is a label. It is not verified, and nothing in the app sends email (there is no email service or dependency).
 - Better Auth stores wallet addresses checksummed. Application tables store them lowercase.
 - A review is never paid or rejected by itself. Undecided reviews stay unpaid until the researcher decides (no 24-hour auto-pay).
-- Review decisions and appeals use the sign-in session plus the survey's researcher wallet. The per-action signature (`AuthAction`)
+- Review decisions use the sign-in session plus the survey's researcher wallet. The per-action signature (`AuthAction`)
   has no "decide" action, and `lib/types.ts` is frozen. Adding one needs all three devs.
-- A rejection of a response in review is saved off chain. The contract allows one decision per respondent, so recording
-  "Don't pay" on chain would make an appeal impossible to pay. Code-confirmed blocks (empty, gibberish, duplicate) are on chain and can't be appealed.
+- Paying or rejecting a response in review is recorded on chain, so it is final and can't be undone. It needs the survey to be
+  open: after the deadline or a close the contract refuses it, and the dashboard says so. There are no appeals.
 - The log route (R8) still returns each respondent's email to the researcher. The dashboard doesn't show it.
 - Sign-up answers are saved on the server (profiles table) but researchers don't see them yet.
 - CSV export (R11) is not built on the server. The dashboard exports the decision log in the browser.
