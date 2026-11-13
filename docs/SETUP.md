@@ -37,6 +37,18 @@ npx hardhat run scripts/export-abi.ts
 Then put the printed address in `NEXT_PUBLIC_CONTRACT_ADDRESS` and rebuild (it is read at build time).
 The fee values are immutable in the contract. Changing them means a new deployment.
 
+Current testnet deployment (Remix + MetaMask, record in `contracts/deployments/bscTestnet.json`):
+
+| | |
+|---|---|
+| `SurveyEscrow` | `0x31F3E8161d4626BB932e0E3A3A9e53BC47688751` |
+| agent | `0xA9E8986712c0b6784Ff5ad7c0a2FB13396561624` |
+| platform | `0x346b021Feeb931A7Ddbc226d5df5e9eA4cD0a09d` |
+| gas / profit per response | `18390000000000` / `20000000000000` wei |
+
+Its runtime bytecode matches the local Hardhat build (immutables and metadata aside), so `lib/chain/abi.ts` is current.
+The metadata hash differs from Hardhat's, so verify it from Remix or the BscScan upload page with the same settings.
+
 ## 4. Check the backend before trusting the UI
 
 ```bash
@@ -57,4 +69,10 @@ npm run e2e                # full run: deployed contract, real screening
 - Email is a label. It is not verified yet (deferred, see AGENTS.md section 9).
 - Better Auth stores wallet addresses checksummed. Application tables store them lowercase.
 - Review actions, pause (R10) and CSV export (R11) are not built.
-- Nothing here has run against Neon, BSC testnet or Groq yet. Expect a first-run debugging pass.
+- Checked live on 2026-11-13: `db:smoke`, `auth:smoke`, `screen()` against Groq, `npm run eval`, and read-only
+  `lib/chain` calls against the deployment above. No decision or close has been sent on testnet yet.
+- `GROQ_MODEL`: `llama-3.3-70b-versatile` is no longer served (404 `model_not_found`), and every response went to
+  Review. Use `openai/gpt-oss-120b`. Eval: 0/20 genuine flagged, 18/20 junk caught, 3/3 injection caught.
+- Only a code check can block payment. To see "Not paid" in a manual run, give an open-ended answer with no
+  vowels (`xkcd bdfg hjkl`), one repeated character (`zzzzzz`), or the exact text of an earlier response.
+  Keyboard mash with vowels (`asdf qwerty`) goes to Review.
