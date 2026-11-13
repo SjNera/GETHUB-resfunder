@@ -57,7 +57,7 @@ function friendly(e: unknown, stage: ConnectStage): WalletError {
   return new WalletError("unknown", "Something went wrong in MetaMask. Try again.");
 }
 
-async function ensureBscTestnet(provider: Eip1193) {
+export async function ensureBscTestnet(provider: Eip1193) {
   const chainId = (await provider.request({ method: "eth_chainId" })) as string;
   if (chainId?.toLowerCase() === BSC_TESTNET.chainId) return;
   try {
