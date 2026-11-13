@@ -22,7 +22,8 @@ import { parseSurveyRef } from "@/lib/ui/join";
 import { checkForm, isFinal } from "@/lib/ui/respond";
 import { validate } from "@/lib/ui/survey-builder";
 import { planFunding, type FundingInput } from "@/lib/ui/survey-submit";
-import { clearProofs, connectWallet, sendCloseSurvey, sendCreateSurvey, signProof, waitForTx } from "@/lib/ui/wallet";
+import { clearProofs, connectWallet, sendCloseSurvey, sendCreateSurvey, signProof, signText, waitForTx } from "@/lib/ui/wallet";
+import { buildResetMessage } from "@/lib/auth/reset-message";
 
 const WALLET_KEY = "rf-wallet-v1";
 const DRAFTS_KEY = "rf-drafts-v1";
@@ -253,6 +254,19 @@ export function createBridge() {
       write(WALLET_KEY, { email: session.email, wallet: w });
       surveys = null;
       return session;
+    },
+
+    /** Forgot password: the wallet linked to the account signs a free message, then the new password logs in. */
+    async resetPassword(email: string, password: string, onPhase: (p: "connect" | "sign" | "save") => void = () => {}): Promise<Session> {
+      const e = email.trim().toLowerCase();
+      onPhase("connect");
+      const wallet = await connectWallet();
+      const { nonce } = await api.resetStart(e);
+      onPhase("sign");
+      const signature = await signText(wallet, buildResetMessage(e, wallet, nonce));
+      onPhase("save");
+      await api.resetConfirm({ email: e, wallet, nonce, signature, password });
+      return this.login(e, password);
     },
 
     /** Log in with email and password. MetaMask is not opened. */

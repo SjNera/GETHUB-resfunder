@@ -69,6 +69,16 @@ export async function connectWallet(): Promise<Address> {
   }
 }
 
+/** Free personal_sign over a plain-text message. */
+export async function signText(wallet: string, message: string): Promise<Hex> {
+  const p = provider();
+  try {
+    return (await p.request({ method: "personal_sign", params: [toHex(message), wallet] })) as Hex;
+  } catch (e) {
+    return wrap(e, "Couldn't sign the message.");
+  }
+}
+
 /** Free personal_sign over the spec's auth message. Cached per action, survey and wallet. */
 export async function signProof(action: AuthAction, surveyId: number, wallet: string, now = Date.now()): Promise<AuthProof> {
   const key = `${action}|${surveyId}|${wallet.toLowerCase()}`;

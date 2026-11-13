@@ -181,8 +181,8 @@ function authShell(inner,{back,step}={}){const A=S.auth,key=(A.stage||'login')+(
 /* Log in / Create account switch. Both pages keep what was typed. */
 const auTabs=on=>`<nav class="au-seg" aria-label="Account"><button data-act="toLogin" ${on==='login'?'aria-current="page"':''}>Log in</button><button data-act="toRegister" ${on==='register'?'aria-current="page"':''}>Create account</button></nav>`;
 function auEmail(dis){const A=S.auth;return `<div class="fld"><label for="aEmail">Email</label><input class="inp" id="aEmail" data-in="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="example@email.com" value="${esc(A.email)}" ${dis?'disabled':''}><div class="err" id="aEmailErr" role="status"></div></div>`}
-function auPw(isNew,dis){const A=S.auth;
-  return `<div class="fld"><label for="aPw">Password</label><div class="au-pw"><input class="inp" id="aPw" data-in="authPw" type="${A.show?'text':'password'}" autocomplete="${isNew?'new-password':'current-password'}" ${isNew?'aria-describedby="aPwHint"':''} value="${esc(A.pw||'')}" ${dis?'disabled':''}><button type="button" class="au-eye" data-act="authShow" aria-label="${A.show?'Hide password':'Show password'}" ${dis?'disabled':''}>${A.show?'Hide':'Show'}</button></div>
+function auPw(isNew,dis,label){const A=S.auth;
+  return `<div class="fld"><label for="aPw">${label||'Password'}</label><div class="au-pw"><input class="inp" id="aPw" data-in="authPw" type="${A.show?'text':'password'}" autocomplete="${isNew?'new-password':'current-password'}" ${isNew?'aria-describedby="aPwHint"':''} value="${esc(A.pw||'')}" ${dis?'disabled':''}><button type="button" class="au-eye" data-act="authShow" aria-label="${A.show?'Hide password':'Show password'}" ${dis?'disabled':''}>${A.show?'Hide':'Show'}</button></div>
     ${isNew?'<p class="hint" id="aPwHint">At least 8 characters.</p>':''}<div class="err" id="aPwErr" role="status"></div></div>`}
 const auAlert=()=>`<div class="au-alert" id="aErr" role="alert">${S.auth.err?`${I.flag}<span>${esc(S.auth.err)}</span>`:''}</div>`;
 function vAuth(){
@@ -190,7 +190,7 @@ function vAuth(){
   const ask=S.after&&S.after.s?'Log in to answer this survey. Your payout goes to your account\'s wallet.':S.after==='publish'?'Log in to build and fund a survey.':'';
   const askP=ask?`<p class="hint au-ask">${ask}</p>`:'';
   if(stage==='login')return authShell(`${auTabs('login')}<h1>Welcome back</h1><p class="au-sub">Log in with your email and password.</p>${askP}
-    <div class="au-form">${auEmail(busy)}${auPw(false,busy)}</div>${auAlert()}
+    <div class="au-form">${auEmail(busy)}${auPw(false,busy)}<p class="au-forgot"><button type="button" class="au-link" data-act="toReset" ${busy?'disabled':''}>Forgot password?</button></p></div>${auAlert()}
     <button class="btn dark block au-cta" data-act="authLogin" ${busy?'disabled aria-busy="true"':''}>${busy?`${I.spin}Logging in…`:'Log in'}</button>
     <p class="au-switch">New here? <button class="au-link" data-act="toRegister">Create an account</button></p>
     <p class="au-note">Made your account before passwords? Create an account again with the same email and wallet to add one.</p>`);
@@ -204,6 +204,13 @@ function vAuth(){
     <button class="btn dark block au-cta" data-act="authRegister" ${!Wl||busy?'disabled':''} ${reg?'aria-busy="true"':''}>${reg?`${I.spin}Confirm in MetaMask…`:'Create account'}</button>
     <p class="hint au-center">MetaMask asks for one free signature to prove the wallet is yours. No gas.</p>
     <p class="au-switch">Already have an account? <button class="au-link" data-act="toLogin">Log in</button></p>`);}
+  /* Forgot password: the wallet linked to the account proves ownership (emails aren't verified). */
+  if(stage==='reset'){const RL={connect:'Waiting for MetaMask…',sign:'Sign in MetaMask…',save:'Saving your new password…'};
+    return authShell(`<h1>Reset your password</h1><p class="au-sub">Use the MetaMask wallet you created your account with. It signs a free message to prove the account is yours. No email is sent.</p>
+    <div class="au-form">${auEmail(busy)}${auPw(true,busy,'New password')}</div>${auAlert()}
+    <button class="btn dark block au-cta" data-act="authReset" ${busy?'disabled aria-busy="true"':''}>${busy?`${I.spin}${RL[busy]||'Working…'}`:'Reset with MetaMask'}</button>
+    <p class="hint au-center">One free signature, no gas. You'll be logged out everywhere else.</p>
+    <p class="au-switch">Remembered it? <button class="au-link" data-act="toLogin">Log in</button></p>`,{back:busy?false:'toLogin'});}
   if(stage==='blocked')return authShell(`<h1>ResFunder is for people 18 and older for now</h1><button class="btn block au-cta" data-act="toLanding">Back to the home page</button>`,{back:false});
   if(stage==='who')return authShell(`<p class="au-ok">${I.check}<span>Signed in as <b>${esc(A.email)}</b>. A few questions so researchers can match you to surveys.</span></p><h1>Who are you?</h1>
     <div class="fld"><label for="pfWho">I'm a</label><select class="inp" id="pfWho" data-pf="who"><option value="" ${P.who?'':'selected'} disabled>Choose one</option>${WHO.map(([v,l])=>`<option value="${v}" ${P.who===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -233,6 +240,12 @@ function authAct(a){const A=S.auth;
       if(!EMAIL_RE.test(e)){setErr('aEmailErr','Enter your email, like example@email.com.');return true}
       if(!A.pw){setErr('aPwErr','Enter your password.');return true}
       A.email=e;A.busy='login';render();B.login(e,A.pw).then(afterAuth,authFail);return true}
+    case 'toReset':if(A.busy)return true;A.err='';A.pw='';A.show=false;go2('reset',0,'in');{const i=document.getElementById(A.email?'aPw':'aEmail');if(i)i.focus()}return true;
+    case 'authReset':{if(A.busy)return true;const e=(A.email||'').trim().toLowerCase();A.err='';setErr('aErr','');
+      if(!EMAIL_RE.test(e)){setErr('aEmailErr','Enter your email, like example@email.com.');return true}
+      if((A.pw||'').length<8){setErr('aPwErr','Use at least 8 characters.');return true}
+      A.email=e;A.busy='connect';render();
+      B.resetPassword(e,A.pw,p=>{A.busy=p;render()}).then(s=>{toast('Password changed. You\'re logged in.');afterAuth(s)},authFail);return true}
     case 'authConnect':if(A.busy)return true;A.busy='connect';A.err='';render();
       B.connect().then(w=>{A.busy='';A.wallet=w;render()},authFail);return true;
     case 'authRegister':{if(A.busy)return true;const e=(A.email||'').trim().toLowerCase();A.err='';setErr('aErr','');
