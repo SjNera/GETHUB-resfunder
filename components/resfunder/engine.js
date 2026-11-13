@@ -45,7 +45,7 @@ const saveDrafts=()=>{try{B.saveDrafts(drafts())}catch(e){}};
 const me=()=>{const email=S.auth.email||'',name=email.split('@')[0].split(/[._-]+/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||'You';
   return {email,name,first:name.split(' ')[0],ini:name.split(' ').map(w=>w[0]).join('').slice(0,2)}};
 
-const S={boot:true,authed:false,landing:true,wallet:'',after:null,want:'',auth:{stage:'email',email:'',wallet:false,pf:null},
+const S={boot:true,authed:false,landing:true,wallet:'',after:null,want:'',auth:{stage:'login',email:'',pw:'',show:false,wallet:'',busy:'',err:'',pf:null},
   page:'dashboard',sid:'',stab:'overview',finsub:'wallet',answered:{},sideOpen:false,
   draft:{},launched:{},closeAsk:false,closeErr:'',busy:'',fundErr:'',
   openRev:null,qQ:'',reasonFor:null,reason:'',dbusy:'',derr:'',
@@ -137,13 +137,10 @@ function stepper(items,cur){
   return `<div class="stepper" role="list">${items.map((it,i)=>{const st=i<cur?'done':i===cur?'now':'';
     return `${i?`<span class="sp-ln ${i<=cur?'done':''}" aria-hidden="true"></span>`:''}<span class="sp-i ${st}" role="listitem" ${st==='now'?'aria-current="step"':''}><span class="c">${i<cur?I.check:i+1}</span><span>${it[0]}${it[1]?`<small>${it[1]}</small>`:''}</span></span>`}).join('')}</div>`;
 }
-/* ================= sign-in (final) =================
-   Email → Who are you? → About you → Where you are (+ two consent boxes) → What describes you best → Wallet → You're all set.
-   No 6-digit code. Errors only on Continue. "Others" opens a text box. Under 18 stops sign-up.
-   A known email goes straight in; an unfinished setup resumes where it stopped. */
-const ACC_KEY='rf-accounts-v3';
-const accounts=()=>{try{return JSON.parse(localStorage.getItem(ACC_KEY)||'{}')}catch(e){return {}}};
-const saveAcc=a=>{try{const all=accounts();all[a.email]=a;localStorage.setItem(ACC_KEY,JSON.stringify(all))}catch(e){}};
+/* ================= sign-in =================
+   Log in: email + password. Create account: email + password + MetaMask on one page (one free signature).
+   Then the sign-up questions: Who are you? → About you → Where you are (+ two consent boxes) → What describes you best.
+   Errors only on submit. "Others" opens a text box. Under 18 stops sign-up and signs out. */
 const pf=()=>S.auth.pf||(S.auth.pf={who:'',whoO:'',age:'',sex:'',sexO:'',region:'',city:'',c1:false,c2:false,g1:'',g1O:'',g2:'',g2O:''});
 const WHO=[['student','Student'],['employed','Employed'],['self','Self-employed'],['unemployed','Unemployed'],['senior','Senior citizen'],['other','Others']];
 const PF={
@@ -171,70 +168,89 @@ function stepError(stage,i){const P=pf();
   if(i===1)return (P.region?'':'Choose your region.')||(P.city.trim()?'':'Enter your city or municipality.')||(P.c1&&P.c2?'':'Tick both boxes to continue.');
   if(i===2){const G=GROUPS[P.who]||[];return (G[0]?oth(P,'g1','Pick one for '+G[0][0].toLowerCase()+'.'):'')||(G[1]?oth(P,'g2','Pick one for '+G[1][0].toLowerCase()+'.'):'')}
   return ''}
-function persist(extra){const A=S.auth;saveAcc(Object.assign({email:A.email,pf:pf(),stage:A.stage,idx:A.idx||0,wallet:A.wallet||null,done:false},extra||{}))}
 /* morph: the card eases to its new height; content slides only when the step changes */
 let auPrevH=0;
 function morphAuth(){const c=document.querySelector('.authc');if(!c)return;const h=c.offsetHeight,from=auPrevH;auPrevH=h;
   if(!from||Math.abs(h-from)<2||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   c.animate([{height:from+'px',overflow:'hidden'},{height:h+'px',overflow:'hidden'}],{duration:260,easing:'cubic-bezier(.23,1,.32,1)'})}
-function authShell(inner,{back,step}={}){const A=S.auth,key=(A.stage||'email')+(A.idx||0),anim=key!==A._k;A._k=key;
+function authShell(inner,{back,step}={}){const A=S.auth,key=(A.stage||'login')+(A.idx||0),anim=key!==A._k;A._k=key;
   return `<div class="auth"><div class="card authc au">
-    <div class="au-top">${back===false?'<span style="width:36px"></span>':`<button class="ibtn" data-act="${back||'toLanding'}" aria-label="Back">${I.back}</button>`}${step?`<span class="au-step">Step ${step} of ${TOTAL}</span>`:''}<span style="width:36px"></span></div>
+    <div class="au-top">${back===false?'<span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>':`<button class="ibtn" data-act="${back||'toLanding'}" aria-label="Back">${I.back}</button>`}${step?`<span class="au-step">Step ${step} of ${TOTAL}</span>`:''}<span style="width:36px"></span></div>
     ${step?`<div class="au-bar" role="progressbar" aria-label="Setup progress" aria-valuemin="1" aria-valuemax="${TOTAL}" aria-valuenow="${step}"><i style="transform:scaleX(${step/TOTAL})"></i></div>`:''}
     <div class="au-body ${anim?(A._dir==='back'?'au-anim-back':'au-anim'):''}">${inner}</div></div></div>`}
+/* Log in / Create account switch. Both pages keep what was typed. */
+const auTabs=on=>`<nav class="au-seg" aria-label="Account"><button data-act="toLogin" ${on==='login'?'aria-current="page"':''}>Log in</button><button data-act="toRegister" ${on==='register'?'aria-current="page"':''}>Create account</button></nav>`;
+function auEmail(dis){const A=S.auth;return `<div class="fld"><label for="aEmail">Email</label><input class="inp" id="aEmail" data-in="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="example@email.com" value="${esc(A.email)}" ${dis?'disabled':''}><div class="err" id="aEmailErr" role="status"></div></div>`}
+function auPw(isNew,dis){const A=S.auth;
+  return `<div class="fld"><label for="aPw">Password</label><div class="au-pw"><input class="inp" id="aPw" data-in="authPw" type="${A.show?'text':'password'}" autocomplete="${isNew?'new-password':'current-password'}" ${isNew?'aria-describedby="aPwHint"':''} value="${esc(A.pw||'')}" ${dis?'disabled':''}><button type="button" class="au-eye" data-act="authShow" aria-label="${A.show?'Hide password':'Show password'}" ${dis?'disabled':''}>${A.show?'Hide':'Show'}</button></div>
+    ${isNew?'<p class="hint" id="aPwHint">At least 8 characters.</p>':''}<div class="err" id="aPwErr" role="status"></div></div>`}
+const auAlert=()=>`<div class="au-alert" id="aErr" role="alert">${S.auth.err?`${I.flag}<span>${esc(S.auth.err)}</span>`:''}</div>`;
 function vAuth(){
-  const A=S.auth,P=pf(),stage=A.stage||'email';setTimeout(morphAuth,0);
-  const ask=S.after&&S.after.s?'Sign in to answer this survey. Your payout goes to the wallet you connect.':S.after==='publish'?'Sign in to build and fund a survey.':'';
-  if(stage==='email')return authShell(`<h1>Continue with your email</h1>${ask?`<p class="hint" style="margin:-4px 0 16px">${ask}</p>`:''}
-    <div class="fld"><label for="aEmail">Email</label><input class="inp" id="aEmail" data-in="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="example@email.com" value="${esc(A.email)}"><div class="err" id="aEmailErr" role="status"></div></div>
-    <button class="btn dark block au-cta" data-act="authEmail">Continue</button>`);
-  if(stage==='blocked')return authShell(`<h1>ResFunder is for people 18 and older for now</h1><button class="btn block au-cta" data-act="toLanding">Back to the home page</button>`);
-  if(stage==='who')return authShell(`<h1>Who are you?</h1>
+  const A=S.auth,P=pf(),stage=A.stage||'login',busy=A.busy;setTimeout(morphAuth,0);
+  const ask=S.after&&S.after.s?'Log in to answer this survey. Your payout goes to your account\'s wallet.':S.after==='publish'?'Log in to build and fund a survey.':'';
+  const askP=ask?`<p class="hint au-ask">${ask}</p>`:'';
+  if(stage==='login')return authShell(`${auTabs('login')}<h1>Welcome back</h1><p class="au-sub">Log in with your email and password.</p>${askP}
+    <div class="au-form">${auEmail(busy)}${auPw(false,busy)}</div>${auAlert()}
+    <button class="btn dark block au-cta" data-act="authLogin" ${busy?'disabled aria-busy="true"':''}>${busy?`${I.spin}Logging in…`:'Log in'}</button>
+    <p class="au-switch">New here? <button class="au-link" data-act="toRegister">Create an account</button></p>
+    <p class="au-note">Made your account before passwords? Create an account again with the same email and wallet to add one.</p>`);
+  if(stage==='register'){const Wl=A.wallet,reg=busy==='register',con=busy==='connect';
+    const wallet=Wl?`<div class="au-wallet"><span class="au-wok">${I.check}</span><span><b class="mono">${shortW(Wl)}</b><small>MetaMask · BSC Testnet</small></span>${reg?'':`<button type="button" class="au-link" data-act="authConnect">Change</button>`}</div>`
+      :`<button type="button" class="mmbtn" data-act="authConnect" ${busy?'disabled aria-busy="true"':''}><span class="fx">${fx}</span>${con?'Waiting for MetaMask…':'Connect MetaMask'}</button>`;
+    return authShell(`${auTabs('register')}<h1>Create your account</h1><p class="au-sub">Your email and password log you in. Your wallet receives payouts and refunds.</p>${askP}
+    <div class="au-form">${auEmail(reg)}${auPw(true,reg)}
+      <div class="fld"><span class="lbl">Wallet</span>${wallet}<p class="hint">Payouts and refunds go to this wallet on BNB Smart Chain testnet. No MetaMask? <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">Install it</a>.</p></div></div>
+    ${auAlert()}
+    <button class="btn dark block au-cta" data-act="authRegister" ${!Wl||busy?'disabled':''} ${reg?'aria-busy="true"':''}>${reg?`${I.spin}Confirm in MetaMask…`:'Create account'}</button>
+    <p class="hint au-center">MetaMask asks for one free signature to prove the wallet is yours. No gas.</p>
+    <p class="au-switch">Already have an account? <button class="au-link" data-act="toLogin">Log in</button></p>`);}
+  if(stage==='blocked')return authShell(`<h1>ResFunder is for people 18 and older for now</h1><button class="btn block au-cta" data-act="toLanding">Back to the home page</button>`,{back:false});
+  if(stage==='who')return authShell(`<p class="au-ok">${I.check}<span>Signed in as <b>${esc(A.email)}</b>. A few questions so researchers can match you to surveys.</span></p><h1>Who are you?</h1>
     <div class="fld"><label for="pfWho">I'm a</label><select class="inp" id="pfWho" data-pf="who"><option value="" ${P.who?'':'selected'} disabled>Choose one</option>${WHO.map(([v,l])=>`<option value="${v}" ${P.who===v?'selected':''}>${l}</option>`).join('')}</select>
       ${P.who==='other'?`<label class="pf-other"><span>Specify</span><input class="inp" data-pft="whoO" maxlength="60" placeholder="Type here" value="${esc(P.whoO)}"></label>`:''}</div>
-    <div class="err" id="aPfErr" role="status"></div><button class="btn dark block au-cta" data-act="authWho">Continue</button>`,{back:'authStepBack'});
-  if(stage==='setup'){const i=A.idx||0;let t='',f='';
+    <div class="err" id="aPfErr" role="status"></div><button class="btn dark block au-cta" data-act="authWho">Continue</button>`,{back:false,step:1});
+  if(stage==='setup'){const i=A.idx||0,saving=busy==='save';let t='',f='';
     if(i===0){t='About you';f=`${pills('age','Age range',PF.age)}${pills('sex','Sex',PF.sex)}`}
     else if(i===1){t='Where you are';f=`<div class="fld"><label for="pfRegion">Region</label><select class="inp" id="pfRegion" data-pf="region"><option value="" ${P.region?'':'selected'} disabled>Choose your region</option>${PF.region.map(r=>`<option ${P.region===r?'selected':''}>${r}</option>`).join('')}</select></div>
       <div class="fld"><label for="pfCity">City or municipality</label><input class="inp" id="pfCity" data-pft="city" autocomplete="address-level2" value="${esc(P.city)}"></div>
       <div class="pf-consent"><label class="chk"><input type="checkbox" data-pfc="c1" ${P.c1?'checked':''}><span>I've read the privacy notice. ResFunder keeps my email and details off-chain. Only my wallet address and payment records go on the blockchain.</span></label>
       <label class="chk"><input type="checkbox" data-pfc="c2" ${P.c2?'checked':''}><span>Researchers see my details only alongside my answers, never my name or email. I can edit or delete them anytime.</span></label></div>`}
     else {t='What describes you best';const G=GROUPS[P.who]||GROUPS.other;f=G.map(([label,opts],k)=>pills(k?'g2':'g1',label,opts)).join('')}
-    return authShell(`<h1>${t}</h1><div class="pf-form">${f}</div><div class="err" id="aPfErr" role="status"></div><button class="btn dark block au-cta" data-act="authStep">Continue</button>`,{back:'authStepBack',step:i+1});}
-  /* The wallet step is the real sign-in: MetaMask picks the account, then signs one free message. */
-  if(stage==='wallet'){const Wl=A.wallet,busy=A.busy;
-    return authShell(`<h1>${A.known?'Welcome back':'Your wallet'}</h1><p class="hint" style="margin:-4px 0 16px">${esc(A.email)}</p>
-      ${Wl?`<div class="au-wallet"><span class="au-wok">${I.check}</span><span><b class="mono">${shortW(Wl.addr)}</b><small>MetaMask · verified</small></span></div>`
-        :`<button class="mmbtn" data-act="connectMM" ${busy?'disabled aria-busy="true"':''}><span class="fx">${fx}</span>${busy?'Waiting for MetaMask…':'Connect MetaMask'}</button>
-        <p class="hint au-center">MetaMask asks you to pick an account, then to sign a free message. No transaction, no gas. No MetaMask? <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">Install it</a>.</p>`}
-      <div class="err" id="aWalletErr" role="status">${esc(A.err||'')}</div>
-      ${Wl?`<button class="btn dark block au-cta" data-act="authFinish">Finish setup</button>`:''}`,{back:busy?false:'authStepBack',step:A.known?0:TOTAL});}
+    return authShell(`<h1>${t}</h1><div class="pf-form">${f}</div><div class="err" id="aPfErr" role="status"></div><button class="btn dark block au-cta" data-act="authStep" ${saving?'disabled aria-busy="true"':''}>${saving?`${I.spin}Saving…`:i>=2?'Finish':'Continue'}</button>`,{back:saving?false:'authStepBack',step:i+2});}
   return authShell(`<div class="au-done"><span class="au-wok">${I.check}</span></div><h1>You're all set</h1><button class="btn dark block au-cta" data-act="authDone">Continue ${I.arrow}</button>`,{back:false});
 }
 function go2(stage,idx,dir){const A=S.auth;A._dir=dir||'in';A.stage=stage;if(idx!=null)A.idx=idx;render();try{window.scrollTo({top:0})}catch(e){}}
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/* Signed in by Log in or Create account: answer the sign-up questions first if they are missing. */
+function afterAuth(sess){const A=S.auth;A.busy='';A.pw='';A.show=false;A.err='';A.sess=sess;A.email=sess.email;S.wallet=sess.wallet||'';
+  if(sess.onboard){A.pf=null;go2('who',0)}else enter(sess)}
+function authFail(e){const A=S.auth;A.busy='';A.err=B.text(e);render()}
 function authAct(a){const A=S.auth;
   switch(a){
-    case 'authEmail':{const e=(A.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)){setErr('aEmailErr','Enter your email, like example@email.com.');return true}
-      A.email=e;A.err='';A.wallet=false;const ex=accounts()[e];
-      /* A finished profile goes straight to the wallet step; an unfinished one resumes where it stopped. */
-      if(ex&&ex.done){A.pf=ex.pf;A.known=true;go2('wallet',3);return true}
-      A.known=false;
-      if(ex){A.pf=ex.pf;go2(ex.stage||'who',ex.idx||0);return true}
-      A.pf=null;persist({stage:'who'});go2('who',0);return true}
+    case 'toLogin':case 'toRegister':if(A.busy)return true;A.err='';go2(a==='toLogin'?'login':'register',0,a==='toLogin'?'back':'in');{const i=document.getElementById('aEmail');if(i&&!i.value)i.focus()}return true;
+    case 'authShow':{A.show=!A.show;render();const i=document.getElementById('aPw');if(i){i.focus();const n=i.value.length;try{i.setSelectionRange(n,n)}catch(e){}}return true}
+    case 'authLogin':{if(A.busy)return true;const e=(A.email||'').trim().toLowerCase();A.err='';setErr('aErr','');
+      if(!EMAIL_RE.test(e)){setErr('aEmailErr','Enter your email, like example@email.com.');return true}
+      if(!A.pw){setErr('aPwErr','Enter your password.');return true}
+      A.email=e;A.busy='login';render();B.login(e,A.pw).then(afterAuth,authFail);return true}
+    case 'authConnect':if(A.busy)return true;A.busy='connect';A.err='';render();
+      B.connect().then(w=>{A.busy='';A.wallet=w;render()},authFail);return true;
+    case 'authRegister':{if(A.busy)return true;const e=(A.email||'').trim().toLowerCase();A.err='';setErr('aErr','');
+      if(!EMAIL_RE.test(e)){setErr('aEmailErr','Enter your email, like example@email.com.');return true}
+      if((A.pw||'').length<8){setErr('aPwErr','Use at least 8 characters.');return true}
+      if(!A.wallet){A.err='Connect MetaMask first.';render();return true}
+      A.email=e;A.busy='register';render();B.register(e,A.pw).then(afterAuth,authFail);return true}
     case 'authWho':{const er=stepError('who');if(er){setErr('aPfErr',er);return true}
-      const P=pf();if(P._who!==P.who){P.g1='';P.g1O='';P.g2='';P.g2O='';P._who=P.who}go2('setup',0);persist();return true}
-    case 'authStep':{const i=A.idx||0,er=stepError('setup',i);if(er){setErr('aPfErr',er);return true}
-      if(i===0&&pf().age==='under_18'){persist({stage:'blocked'});go2('blocked');return true}
-      if(i>=2)go2('wallet',3);else go2('setup',i+1);persist();return true}
-    case 'authStepBack':{const s=A.stage,i=A.idx||0;A.err='';
-      if(s==='wallet'&&A.known)go2('email',0,'back');else if(s==='wallet')go2('setup',2,'back');else if(s==='setup')i===0?go2('who',0,'back'):go2('setup',i-1,'back');else go2('email',0,'back');return true}
-    case 'connectMM':if(A.busy)return true;A.busy=true;A.err='';render();
-      B.signIn(A.email).then(sess=>{A.busy=false;A.wallet={addr:sess.wallet,verified:true};S.wallet=sess.wallet;
-          if(!A.known){const P=pf();B.saveProfile({who:P.who,whoO:P.whoO,age:P.age,sex:P.sex,sexO:P.sexO,region:P.region,city:P.city,c1:!!P.c1,c2:!!P.c2,g1:P.g1,g1O:P.g1O,g2:P.g2,g2O:P.g2O}).catch(e=>toast("Couldn't save your profile: "+B.text(e)))}
-          if(A.known){persist({done:true});enter(sess)}else{persist();render()}},
-        e=>{A.busy=false;A.err=B.text(e);render()});return true;
-    case 'authFinish':if(!A.wallet){setErr('aWalletErr','Connect MetaMask to finish setup.');return true}persist({done:true});go2('done');return true;
-    case 'authDone':enter({email:A.email,wallet:S.wallet});toast('Welcome to ResFunder');return true;
+      const P=pf();if(P._who!==P.who){P.g1='';P.g1O='';P.g2='';P.g2O='';P._who=P.who}go2('setup',0);return true}
+    case 'authStep':{if(A.busy)return true;const i=A.idx||0,er=stepError('setup',i);if(er){setErr('aPfErr',er);return true}
+      /* Under 18 stops sign-up and ends the session. */
+      if(i===0&&pf().age==='under_18'){B.signOut().catch(()=>{});go2('blocked');return true}
+      if(i<2){go2('setup',i+1);return true}
+      const P=pf();A.busy='save';render();
+      B.saveProfile({who:P.who,whoO:P.whoO,age:P.age,sex:P.sex,sexO:P.sexO,region:P.region,city:P.city,c1:!!P.c1,c2:!!P.c2,g1:P.g1,g1O:P.g1O,g2:P.g2,g2O:P.g2O})
+        .then(()=>{A.busy='';go2('done')},e=>{A.busy='';render();setErr('aPfErr',"Couldn't save your answers: "+B.text(e))});return true}
+    case 'authStepBack':{const i=A.idx||0;if(A.stage==='setup'&&i>0)go2('setup',i-1,'back');else go2('who',0,'back');return true}
+    case 'authDone':enter(Object.assign({},A.sess||{email:A.email,wallet:S.wallet},{onboard:false}));toast('Welcome to ResFunder');return true;
   }
   return false}
 
@@ -265,7 +281,7 @@ function vDashboard(){
   <div class="home"><section><div class="between" style="margin-bottom:12px"><h2 class="h">Your surveys</h2><button class="btn ghost" data-nav="surveys">View all ${I.arrow}</button></div>
     ${surveysBlock(SURVEYS)}</section>
     <aside class="card needs"><div class="between"><h3 class="h">In review</h3><span class="cnt">${R.length}</span></div>
-      ${R.length?R.slice(0,6).map(r=>`<button class="it" data-openrev="${r.key}"><span><b>${esc(r.why)}</b><small>${r.rid} · ${esc(r.stitle)}</small></span><span class="tl2">${r.when}</span></button>`).join('')
+      ${R.length?R.slice(0,6).map(r=>`<button class="it" data-openrev="${r.key}"><span><b>${esc(X(r).title)}</b><small>${r.rid} · ${esc(r.stitle)}</small></span><span class="tl2">${r.when}</span></button>`).join('')
       :`<p class="muted" style="margin:10px 0 0">${opened?'Nothing is in review in the surveys you opened.':'Open a survey to see the responses its checks sent to review.'}</p>`}</aside></div>`;
 }
 
@@ -330,73 +346,85 @@ function sOverview(s,w){const m=w.log.sum,closed=s.status==='closed';
 }
 /* Review queue (survey tab): responses in review. A person decides; the AI never does. */
 const ansText=(q,a)=>a==null||a===''?'':q.type==='mc'?(q.opts[a]||''):String(a);
-function qRows(){const q=S.qQ.trim().toLowerCase();return reviews().filter(r=>r.sid===S.sid&&(!q||(r.rid+' '+r.wallet+' '+r.why).toLowerCase().includes(q)))}
+function qRows(){const q=S.qQ.trim().toLowerCase();return reviews().filter(r=>r.sid===S.sid&&(!q||(r.rid+' '+r.wallet+' '+X(r).title).toLowerCase().includes(q)))}
 function queueTable(){const rows=qRows();
   if(!rows.length)return reviews().some(r=>r.sid===S.sid)?`<div class="card empty"><p>No responses match your search.</p><button class="btn" data-act="qClear">Clear search</button></div>`
     :`<div class="card empty"><h3>All caught up</h3><p>Responses the checks can't settle show up here.</p><button class="btn" data-stab="log">See decisions</button></div>`;
-  const tr=r=>`<tr><td><div class="nm"><b>${r.rid}</b><small>${r.w}</small></div></td><td>${esc(r.why)}</td><td><span class="tp review">Review</span></td><td class="muted">${r.when}</td>
-    <td><span class="tp pending">Pending</span></td><td class="act"><button class="rvbtn" data-openrev="${r.key}">Review</button></td></tr>`;
-  return `<div class="tbox"><table class="t"><thead><tr><th>Response</th><th>Reason</th><th>Type</th><th>Submitted</th><th>Status</th><th class="act">Action</th></tr></thead><tbody>${rows.map(tr).join('')}</tbody></table></div>
+  const tr=r=>`<tr><td><div class="nm"><b>${r.rid}</b><small>${r.w}</small></div></td><td class="why" data-label="Why">${whyCell(r)}</td><td data-label="Type"><span class="tp review">Review</span></td><td class="muted" data-label="Submitted">${r.when}</td>
+    <td data-label="Status"><span class="tp pending">Pending</span></td><td class="act"><button class="rvbtn" data-openrev="${r.key}">Review</button></td></tr>`;
+  return `<div class="tbox"><table class="t"><thead><tr><th>Response</th><th>Why</th><th>Type</th><th>Submitted</th><th>Status</th><th class="act">Action</th></tr></thead><tbody>${rows.map(tr).join('')}</tbody></table></div>
     <div class="tfoot"><span>Showing ${rows.length} · they stay unpaid until you decide</span></div>`;
 }
 function sQueue(){
   return `<div class="tools"><label class="sbox">${I.search}<input id="qQ" data-in="qQ" type="search" placeholder="Search by ID or wallet" value="${esc(S.qQ)}" aria-label="Search the review queue"></label></div>
     <div id="qBody">${queueTable()}</div>`}
-/* Review drawer: the answers, the reasons, and the decision. */
-function decideFoot(r,w){const rate=w.survey.rate,busy=S.dbusy,err=S.derr?`<div class="err" role="alert" style="margin-bottom:8px">${esc(S.derr)}</div>`:'';
-  if(busy)return `<p class="rd-ask rd-ask-sm">${busy==='pay'?'Sending the payment. This can take a few seconds.':'Recording your decision on chain. This can take a few seconds.'}</p><div class="rd-two"><button class="btn" disabled>Please wait</button></div>`;
-  if(S.reasonFor===r.key)return `${err}<p class="rd-ask">Why aren't you paying?<small>The respondent sees this reason. It is recorded on chain and can't be undone.</small></p>
+/* Why a response was decided (bridge explain()). Before the screening details load, the reason text stands in. */
+const X=r=>r.x||{title:r.why,sub:'',pills:[],steps:[],focus:null,others:[],time:null,timeNote:null,you:null};
+const MK={pass:'✓',warn:'!',fail:'✕',skip:'–'};
+const whyCell=r=>{const x=X(r);return `<b class="why-t">${esc(x.title)}</b>${x.pills.length?`<span class="xp">${x.pills.map(p=>`<span class="xpill ${p.tone}"><i aria-hidden="true">${MK[p.tone]}</i>${esc(p.label)}</span>`).join('')}</span>`:''}`};
+/* Any row of an opened survey, for the drawer. Review rows also get prev/next and the decision. */
+const anyRow=key=>{for(const w of Object.values(D.ws)){const r=w.log.rows.find(x=>x.key===key);if(r)return Object.assign({},r,{sid:w.survey.id,stitle:w.survey.title})}return null};
+/* Review drawer: the reason as the title, the answer to look at, the rule steps, the rest folded away. */
+function decideFoot(r,w){const rate=w.survey.rate,busy=S.dbusy,err=S.derr?`<div class="err" role="alert">${esc(S.derr)}</div>`:'';
+  if(busy)return `<p class="rd2-fine">${busy==='pay'?'Sending the payment. This can take a few seconds.':'Recording your decision on chain. This can take a few seconds.'}</p><div class="rd-two"><button class="btn" disabled>${I.spin}Please wait</button></div>`;
+  if(S.reasonFor===r.key)return `${err}<p class="rd-ask">Why aren't you paying? <small>The respondent sees this.</small></p>
     <div class="rd-reasons" role="radiogroup" aria-label="Reason">${B.rejectReasons.map(([c,t])=>`<label class="pf-pill" data-reason="${c}"><input type="radio" name="rd-reason" ${c===S.reason?'checked':''}><span>${esc(t)}</span></label>`).join('')}</div>
-    <div class="rd-two"><button class="btn" data-act="cancelNo">Cancel</button><button class="btn red" data-act="decide" data-d="dont_pay" data-id="${r.key}">${I.x}Don't pay</button></div>`;
-  return `${err}<p class="rd-ask rd-ask-sm">It stays unpaid until you decide. Paying sends ${rate} from the contract to the respondent. Either decision is recorded on chain and can't be undone.</p>
-    <div class="rd-two"><button class="btn rd-no" data-act="askNo" data-id="${r.key}">${I.x}Don't pay</button><button class="btn dark" data-act="decide" data-d="pay" data-id="${r.key}">${I.check}Pay ${rate}</button></div>`}
-function reviewPanel(){const r=revRow(S.openRev);if(!r)return '';const w=W(r.sid),Q=w.survey.q,P=reviews(),i=P.findIndex(x=>x.key===r.key);
-  const fo=Q.findIndex(q=>q.type==='open'),k=fo<0?0:fo;
-  const qa=j=>{const t=ansText(Q[j],r.a[j]);return `<div class="rd-oa"><dt>${j+1}. ${esc(Q[j].t)}</dt><dd class="${t?'':'none'}">${t?esc(t):'No answer'}</dd></div>`};
-  const first=ansText(Q[k],r.a[k]);
-  return `<div class="backdrop" data-act="closeRev"></div><aside class="drawer rd" role="dialog" aria-modal="true" aria-labelledby="rdTitle">
-    <div class="rd-top"><button class="ibtn" data-step="-1" aria-label="Previous response" ${i<=0?'disabled':''}>${I.chevL}</button><span class="rd-count">${i+1} of ${P.length}</span><button class="ibtn" data-step="1" aria-label="Next response" ${i>=P.length-1?'disabled':''}>${I.chev}</button><span class="sp"></span><button class="ibtn" data-act="closeRev" aria-label="Close review">${I.x}</button></div>
-    <div class="rd-body">
-      <div class="rd-head"><span class="rd-tile">${I.flag}</span><div><h2 id="rdTitle">Sent to review</h2>
-        <div class="rd-meta"><span class="mono">${r.rid}</span><span class="rd-pill warn">Needs review</span></div></div></div>
-      <p class="rd-desc">Submitted ${r.when}.</p>
-      <section class="rd-sec"><h3>${I.doc}Question ${k+1} of ${Q.length}</h3><p class="rd-qt">${esc(Q[k].t)}</p><blockquote class="rd-quote">${first?esc(first):'<span class="rd-muted">No answer</span>'}</blockquote></section>
-      <section class="rd-sec"><h3>${I.shield}Screening</h3>
-        ${(r.reasons.length?r.reasons:[r.why]).map(x=>`<div class="rd-call warn" style="padding:10px 12px;display:flex;gap:8px;align-items:flex-start">${I.flag.replace('<svg','<svg style="width:15px;height:15px;flex:none;margin-top:3px"')}<span>${esc(x)}</span></div>`).join('')}</section>
-      <div class="rd-card"><dl>
-        <div><dt>Why it's here</dt><dd>The AI label can only send a response to review. It can\'t pay or block by itself.</dd></div>
-        <div><dt>Survey</dt><dd>${esc(w.survey.title)}</dd></div>
-        <div><dt>Wallet</dt><dd class="rd-w"><span class="mono">${r.w}</span><button class="ibtn" data-act="copyW" data-w="${r.wallet}" aria-label="Copy wallet address">${I.link}</button></dd></div>
-      </dl>
-      ${Q.length>1?`<details class="rd-more"><summary>Show other answers ${I.down}</summary><dl class="rd-oans">${Q.map((q,j)=>j===k?'':qa(j)).join('')}</dl></details>`:''}</div>
+    <div class="rd-two"><button class="btn soft" data-act="cancelNo">Cancel</button><button class="btn red" data-act="decide" data-d="dont_pay" data-id="${r.key}">Don't pay</button></div>`;
+  return `${err}<div class="rd-two"><button class="btn soft rd-no" data-act="askNo" data-id="${r.key}">Don't pay</button><button class="btn dark" data-act="decide" data-d="pay" data-id="${r.key}">Pay ${rate}</button></div>
+    <p class="rd2-fine">Recorded on chain. Can't be undone.</p>`}
+function recordFoot(r){
+  if(r.res==='pending')return `<p class="rd2-fine rd2-left">Still being checked. This updates on Refresh.</p>`;
+  return `<div class="rd2-rec"><span>${r.res==='pay'?'Paid.':'Final.'} Recorded on chain.</span>${r.txUrl?`<a class="rd2-tx mono" href="${r.txUrl}" target="_blank" rel="noopener">${r.tx} ↗</a>`:''}</div>`}
+const RDST={review:['rev','In review'],pay:['pay','Paid'],no:['no','Not paid'],pending:['rev','Checking']};
+function reviewPanel(){const r=revRow(S.openRev)||anyRow(S.openRev);if(!r)return '';const w=W(r.sid),Q=w.survey.q,x=X(r),rev=r.res==='review';
+  const P=rev?reviews():[],i=P.findIndex(y=>y.key===r.key),f=x.focus,tag=new Map(x.others.map(o=>[o.qi,o.tag]));
+  const nav=rev?`<button class="rd2-ib" data-step="-1" aria-label="Previous response" ${i<=0?'disabled':''}>${I.chevL}</button><span class="rd2-count">${i+1} of ${P.length}</span><button class="rd2-ib" data-step="1" aria-label="Next response" ${i>=P.length-1?'disabled':''}>${I.chev}</button>`:'';
+  const fig=f?`<figure class="rd2-fig"><figcaption>Q${f.qi+1} · ${esc(f.question)}</figcaption><blockquote class="${f.tone==='fail'?'mono':''}">${f.answer?esc(f.answer):'<span class="muted">No answer</span>'}</blockquote>
+      <div class="rd2-ai"><p class="rd2-tagrow"><span class="rd2-tag ${f.tone}">${esc(f.tag)}</span>${f.chips.map(esc).join(' · ')}</p>${f.aiSays?`<p class="rd2-says"><small>The AI's reason, as written</small>“${esc(f.aiSays)}”</p>`:''}${f.note?`<p class="rd2-note">${esc(f.note)}</p>`:''}</div></figure>`:'';
+  const steps=x.steps.length?`<section aria-labelledby="rdHow"><h3 class="rd2-h" id="rdHow">How it was decided</h3><ol class="rd2-list">${x.steps.map(s=>`<li class="${s.decided?'on':''}"><span class="rd2-mk ${s.tone}" aria-hidden="true">${MK[s.tone]}</span><span class="l">${esc(s.label)}</span><span class="v ${s.decided?s.tone:''}">${esc(s.value)}</span></li>`).join('')}</ol></section>`:'';
+  const rest=Q.map((q,j)=>j).filter(j=>!f||j!==f.qi);
+  const oa=rest.map(j=>{const t=ansText(Q[j],r.a[j]),g=tag.get(j);return `<div><dt>Q${j+1} · ${esc(Q[j].t)}${g?` <span class="rd2-tag warn">${esc(g)}</span>`:''}</dt><dd class="${t?'':'muted'}">${t?esc(t):'No answer'}</dd></div>`}).join('');
+  const chev=`<span class="rd2-chev" aria-hidden="true">${I.chev}</span>`;
+  return `<div class="backdrop" data-act="closeRev"></div><aside class="drawer rd rd2" role="dialog" aria-modal="true" aria-labelledby="rdTitle">
+    <div class="rd2-top">${nav}<span class="sp"></span><button class="rd2-x" data-act="closeRev" aria-label="Close">${I.x}</button></div>
+    <div class="rd2-body">
+      <header><p class="rd2-status"><span class="st"><i class="${RDST[r.res][0]}"></i><b>${RDST[r.res][1]}</b></span><span aria-hidden="true">·</span><span class="mono">${r.rid}</span></p>
+        <h2 id="rdTitle">${esc(x.title)}</h2>${x.sub?`<p class="rd2-sub">${esc(x.sub)}</p>`:''}</header>
+      ${fig}${steps}
+      <div class="rd2-list rd2-more">
+        ${rest.length?`<details><summary><span class="l">${f?'Other answers':'Answers'}</span><span class="v">${rest.length}</span>${chev}</summary><dl class="rd2-oa">${oa}</dl></details>`:''}
+        <details><summary><span class="l">Timing</span><span class="v">${x.time||'—'}</span>${chev}</summary><p>${esc(x.timeNote||'Timing shows once screening finishes.')}</p></details>
+        <details><summary><span class="l">Respondent</span><span class="v mono">${r.w}</span>${chev}</summary><p>Submitted ${r.when}. <button class="au-link" data-act="copyW" data-w="${r.wallet}">Copy wallet address</button></p></details>
+      </div>
     </div>
-    <div class="rd-foot">${decideFoot(r,w)}</div></aside>`}
+    <div class="rd2-foot">${rev?decideFoot(r,w):recordFoot(r)}</div></aside>`}
 
 /* Decision log */
 const RESL={pay:['','Paid'],no:['no','Not paid'],review:['rev','In review'],pending:['rev','Checking']};
-function logFiltered(){const w=W(S.sid),q=S.lQ.trim().toLowerCase();return w.log.rows.filter(r=>(S.lRes==='all'||r.res===S.lRes)&&(!q||[r.rid,r.wallet,r.why].join(' ').toLowerCase().includes(q)))}
+function logFiltered(){const w=W(S.sid),q=S.lQ.trim().toLowerCase();return w.log.rows.filter(r=>(S.lRes==='all'||r.res===S.lRes)&&(!q||[r.rid,r.wallet,r.why,X(r).title].join(' ').toLowerCase().includes(q)))}
 function logBody(){const rows=logFiltered(),n=W(S.sid).log.rows.length,all=rows.length>0&&rows.every(r=>S.lSel.has(r.key));
-  const tr=r=>`<tr class="${S.lSel.has(r.key)?'sel':''}"><td class="cb"><input type="checkbox" data-chk="${r.key}" aria-label="Select ${r.rid}" ${S.lSel.has(r.key)?'checked':''}></td><td class="mono">${r.rid}</td>
-    <td><span class="who"><span class="tile t${parseInt(r.wallet.slice(2,4),16)%4}">${r.wallet.slice(2,4).toUpperCase()}</span><span class="mono muted">${r.w}</span></span></td>
-    <td>${esc(r.why)}</td><td>${r.amount}</td><td><span class="st"><i class="${RESL[r.res][0]}"></i>${RESL[r.res][1]}</span></td>
-    <td>${r.txUrl?`<a class="mono" href="${r.txUrl}" target="_blank" rel="noopener">${r.tx}</a>`:'<span class="muted">—</span>'}</td><td class="muted">${r.when}</td></tr>`;
-  return `<div class="tbox"><table class="t"><thead><tr><th class="cb"><input type="checkbox" data-chkall="1" aria-label="Select all shown" ${all?'checked':''}></th><th>Response ID</th><th>Respondent</th><th>Reason</th><th>Amount</th><th>Status</th><th>Transaction</th><th>When</th></tr></thead>
+  const tr=r=>`<tr class="${S.lSel.has(r.key)?'sel':''}"><td class="cb"><input type="checkbox" data-chk="${r.key}" aria-label="Select ${r.rid}" ${S.lSel.has(r.key)?'checked':''}></td>
+    <td><div class="nm"><b class="mono">${r.rid}</b><small class="mono">${r.w}</small></div></td>
+    <td class="why" data-label="Why">${whyCell(r)}</td><td class="num" data-label="Amount">${r.amount}</td><td data-label="Status"><span class="st"><i class="${RESL[r.res][0]}"></i>${RESL[r.res][1]}</span></td>
+    <td data-label="Transaction">${r.txUrl?`<a class="mono" href="${r.txUrl}" target="_blank" rel="noopener">${r.tx}</a>`:'<span class="muted">—</span>'}</td><td class="muted" data-label="When">${r.when}</td>
+    <td class="act">${r.res==='review'?`<button class="rvbtn" data-openrev="${r.key}">Review</button>`:`<button class="tbtn" data-openrev="${r.key}">Details</button>`}</td></tr>`;
+  return `<div class="tbox"><table class="t tlog"><thead><tr><th class="cb"><input type="checkbox" data-chkall="1" aria-label="Select all shown" ${all?'checked':''}></th><th>Response</th><th>Why</th><th class="num">Amount</th><th>Status</th><th>Transaction</th><th>When</th><th class="act"><span class="sr">Open</span></th></tr></thead>
     <tbody>${rows.length?rows.map(tr).join(''):`<tr><td colspan="8" class="muted" style="text-align:center;padding:36px">No decisions match. <button class="btn" data-act="lClear">Clear search and filters</button></td></tr>`}</tbody></table></div>
     <div class="tfoot"><span>Showing ${rows.length} of ${n}${S.lSel.size?` · ${S.lSel.size} selected`:''}</span></div>`}
 const exportLabel=()=>I.dl+(S.lSel.size?`Export ${S.lSel.size} selected`:'Export CSV');
 function sLog(s,w){if(!w.log.rows.length)return `<div class="card empty"><h3>No decisions yet</h3><p>Every payment decision for this survey will be listed here, with its reason and transaction.</p></div>`;
-  const fc=S.lRes!=='all'?1:0;
-  const pop=S.fOpen?`<div class="fpop" role="dialog" aria-label="Filter decisions"><div><div class="fl">Status</div><div class="opts">${[['all','All'],['pay','Paid'],['no','Not paid'],['review','In review']].map(([v,l])=>`<button class="fopt" data-fres="${v}" aria-pressed="${S.lRes===v}">${l}</button>`).join('')}</div></div></div>`:'';
+  const R=w.log.rows,cnt=v=>v==='all'?R.length:R.filter(r=>r.res===v).length;
+  const chips=[['all','All',''],['review','In review','rev'],['no','Not paid','no'],['pay','Paid','pay']].map(([v,l,c])=>`<button class="fchip" data-fres="${v}" aria-pressed="${S.lRes===v}">${c?`<i class="${c}" aria-hidden="true"></i>`:''}${l}<span>${cnt(v)}</span></button>`).join('');
   return `<div class="tools"><label class="sbox">${I.search}<input id="lQ" data-in="lQ" type="search" placeholder="Search ID, wallet or reason" value="${esc(S.lQ)}" aria-label="Search decisions"></label>
-    <div class="fwrap"><button class="tbtn" data-act="fToggle" aria-expanded="${S.fOpen}">${I.filter}Filter${fc?` <span class="fc">${fc}</span>`:''}</button>${pop}</div><button class="tbtn" id="exportBtn" data-act="export">${exportLabel()}</button></div>
-    <div class="legend2"><div class="lgrp"><span class="lt">Status</span><span class="li2 st"><i></i>Paid by the contract</span><span class="li2 st"><i class="no"></i>Not paid, a code check failed</span><span class="li2 st"><i class="rev"></i>In review</span></div></div>
+    <div class="fchips" role="group" aria-label="Filter by status">${chips}</div><span class="sp"></span><button class="tbtn" id="exportBtn" data-act="export">${exportLabel()}</button></div>
+    <p class="rulenote">${I.shield}Code rules decide Pay and Don't pay. The AI can only send a response to you for review.</p>
     <div id="logBody">${logBody()}</div>`}
 /* A cell that starts like a formula is quoted, so a spreadsheet shows respondent text as text. */
 function exportCsv(){const w=W(S.sid),rows=logFiltered().filter(r=>!S.lSel.size||S.lSel.has(r.key)),Q=w.survey.q;
   if(!rows.length)return toast('Nothing to export yet.');
   const cell=v=>{let t=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};
   const head=['Response','Wallet','Status','Amount','Reason','Transaction','Submitted'].concat(Q.map((q,i)=>`Q${i+1}. ${q.t}`));
-  const lines=rows.map(r=>[r.rid,r.wallet,RESL[r.res][1],r.amount,r.why,r.txUrl,new Date(r.at).toISOString()].concat(Q.map((q,i)=>ansText(q,r.a[i]))).map(cell).join(','));
+  const lines=rows.map(r=>[r.rid,r.wallet,RESL[r.res][1],r.amount,X(r).title+(r.why&&r.why!==X(r).title?' ('+r.why+')':''),r.txUrl,new Date(r.at).toISOString()].concat(Q.map((q,i)=>ansText(q,r.a[i]))).map(cell).join(','));
   const url=URL.createObjectURL(new Blob(['﻿'+[head.map(cell).join(',')].concat(lines).join('\r\n')],{type:'text/csv'})),a=document.createElement('a');
   a.href=url;a.download=`${w.survey.code}-decisions.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`Exported ${rows.length} decision${rows.length===1?'':'s'}`)}
 /* Questions preview */
@@ -702,8 +730,8 @@ function funded(draftId,F){S.busy='';S.fundErr='';D.pend=null;
   toast('Budget locked · survey is live');loadList(true);loadBalance()}
 function act(a,el){if(authAct(a))return;const s=SV(S.sid);
   switch(a){
-    case 'toLanding':S.landing=true;S.after=null;S.auth.stage='email';render();try{window.scrollTo({top:0})}catch(e){}break;
-    case 'lpStart':S.after=el.dataset.to||null;S.landing=false;S.auth.stage='email';S.auth.err='';render();try{window.scrollTo({top:0})}catch(e){}{const i=document.getElementById('aEmail');if(i)i.focus()}break;
+    case 'toLanding':S.landing=true;S.after=null;S.auth.stage='login';S.auth.err='';render();try{window.scrollTo({top:0})}catch(e){}break;
+    case 'lpStart':S.after=el.dataset.to||null;S.landing=false;S.auth.stage=el.dataset.stage==='register'?'register':'login';S.auth.err='';render();try{window.scrollTo({top:0})}catch(e){}{const i=document.getElementById('aEmail');if(i)i.focus()}break;
     case 'lpScroll':{const t=document.getElementById(el.dataset.to);if(t)t.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});break;}
     case 'signOut':if(S.busy)return;S.busy='out';render();B.signOut().then(()=>location.assign('/'),()=>location.assign('/'));break;
     case 'sideOpen':S.sideOpen=true;render();break;
@@ -808,6 +836,7 @@ document.addEventListener('input',e=>{const t=e.target,d=t.dataset;if(!d)return;
   const s=SV(S.sid);
   if(d.in){const k=d.in,v=t.value;
     if(k==='authEmail'){S.auth.email=v;setErr('aEmailErr','')}
+    else if(k==='authPw'){S.auth.pw=v;setErr('aPwErr','')}
     else if(k==='sTitle'){s.title=v;refreshPrev();saveDrafts()}else if(k==='sDesc'){s.desc=v;refreshPrev();saveDrafts()}
     else if(k==='qQ'){S.qQ=v;const b=document.getElementById('qBody');if(b)b.innerHTML=queueTable()}
     else if(k==='lQ'){S.lQ=v;refreshLog()}
@@ -838,7 +867,7 @@ document.addEventListener('change',e=>{const el=e.target,d=el.dataset;if(!d)retu
 document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.col');if(!c)return;const i=+c.dataset.day;if(i===S.day)return;S.day=i;refreshPlot()});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(S.closeAsk){if(!S.busy){S.closeAsk=false;render()}}else if(S.sv){svClose()}else if(S.openRev){S.openRev=null;render()}else if(S.fOpen){S.fOpen=false;render()}else if(S.sideOpen){S.sideOpen=false;render()}return}
-  if(e.key==='Enter'&&e.target.matches&&e.target.matches('input.inp,#jLink')){const m={aEmail:'authEmail',jLink:'openLink'}[e.target.id];if(m){e.preventDefault();act(m)}}
+  if(e.key==='Enter'&&e.target.matches&&e.target.matches('input.inp,#jLink,#aPw')){const au=S.auth.stage==='register'?'authRegister':'authLogin',m={aEmail:au,aPw:au,jLink:'openLink'}[e.target.id];if(m){e.preventDefault();act(m)}}
 });
 function fromHash(){const h=(location.hash||'').slice(1);if(!h||!S.authed)return;if(h.startsWith('survey-')){const [,sid,tab]=h.split('-');if(SV(sid)&&!(S.page==='survey'&&S.sid===sid&&S.stab===(tab||S.stab)))openSurvey(sid,tab)}else if(/^(dashboard|surveys|answer|settings|help)$/.test(h))S.page=h;else if(/^finance-(wallet|payouts|refunds)$/.test(h)){S.page='finance';S.finsub=h.slice(8)}}
 /* /#how, /#rules and /#start from the other pages scroll to that landing section */
@@ -856,7 +885,7 @@ try{const q=new URLSearchParams(location.search),sid=q.get('s'),go=q.get('go');
   if(S.after||q.get('signin'))S.landing=false;
   if(location.search)history.replaceState(null,'',location.pathname+location.hash)}catch(e){}
 render();
-B.session().then(sess=>{if(sess)enter(sess);else{S.boot=false;render();lpAnchor()}},()=>{S.boot=false;render();lpAnchor()});
+B.session().then(sess=>{if(!sess){S.boot=false;render();lpAnchor()}else if(sess.onboard){S.boot=false;S.landing=false;Object.assign(S.auth,{email:sess.email,sess,stage:'who',idx:0});S.wallet=sess.wallet||'';render()}else enter(sess)},()=>{S.boot=false;render();lpAnchor()});
 
 /* ================= landing (shown before sign-in) ================= */
 function vLanding(){
@@ -868,7 +897,7 @@ function vLanding(){
   return `<div class="lp">
   <header class="lp-nav"><div class="lp-navin"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>
     <nav class="lp-links" aria-label="Site"><button data-act="lpScroll" data-to="lp-how">How it works</button><button data-act="lpScroll" data-to="lp-rules">Screening rules</button></nav>
-    <span class="lp-navr"><button class="btn ghost" data-act="lpStart" data-to="">Sign in</button><button class="btn dark" data-act="lpStart" data-to="publish">Get started</button></span></div></header>
+    <span class="lp-navr"><button class="btn ghost" data-act="lpStart" data-to="">Sign in</button><button class="btn dark" data-act="lpStart" data-to="publish" data-stage="register">Get started</button></span></div></header>
 
   <section class="lp-hero">
     <div class="lp-orbit" aria-hidden="true"><i></i><i></i><i></i>${orbit.map(([ic,l,c])=>`<span class="lp-chip ${c}" title="${l}">${ic}</span>`).join('')}</div>

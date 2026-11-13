@@ -3,6 +3,7 @@
 // engine only as display strings.
 import type { HistoryItem, LogResponse, LogRow, OpenSurvey, SurveySummary } from "@/lib/api/shapes";
 import type { Question, ResponseStatus, SurveyJson } from "@/lib/types";
+import type { Explain } from "./explain";
 import { refundAmount } from "./fees";
 import { formatBnb, formatDuration, formatWhen, shortHash, txUrl } from "./format";
 import type { Draft } from "./respond";
@@ -236,7 +237,8 @@ export type EngineLogRow = {
   tx: string;
   txUrl: string;
   /** Answers by question position, in the shape the engine's answer views read. */
-  a: (number | string | undefined)[];
+  a: (number | string | undefined)[];  /** Why it was decided, for the log and the review drawer. Added once the screening details load. */
+  x?: Explain;
 };
 
 export type EngineLog = {

@@ -1,6 +1,6 @@
 "use client";
 
-// Browser side of Better Auth: wallet (SIWE) + email sign-in, session hook, sign-out.
+// Browser side of Better Auth: register with wallet (SIWE) + email, log in with email + password, sign-out.
 import { siweClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { getAddress, toHex } from "viem";
@@ -51,4 +51,17 @@ export async function signInWithWallet(email: string): Promise<{ wallet: `0x${st
     throw new SignInError("That email is already linked to a different wallet. Use that wallet, or a different email.");
   }
   return { wallet };
+}
+
+/** Log in with email and password. No MetaMask. */
+export async function loginWithPassword(email: string, password: string): Promise<{ email: string }> {
+  const wanted = email.trim().toLowerCase();
+  const res = await authClient.signIn.email({ email: wanted, password });
+  if (res.error) {
+    const status = (res.error as { status?: number }).status;
+    if (status === 401 || status === 400 || status === 403) throw new SignInError("Wrong email or password. Check both and try again.");
+    if (status === 429) throw new SignInError("Too many tries. Wait a minute, then try again.");
+    throw new SignInError("Couldn't log in. Try again.");
+  }
+  return { email: wanted };
 }

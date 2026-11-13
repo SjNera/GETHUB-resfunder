@@ -35,7 +35,8 @@ export async function saveMyProfile(headers: Headers, body: unknown): Promise<{ 
   return { saved: true };
 }
 
-export async function getMyProfile(headers: Headers): Promise<{ profile: Record<string, unknown> | null }> {
+/** The profile, plus the account's wallet so a password login knows it without asking MetaMask. */
+export async function getMyProfile(headers: Headers): Promise<{ profile: Record<string, unknown> | null; wallet: string }> {
   const me = await requireSession(headers);
-  return { profile: await getProfile(me.userId) };
+  return { profile: await getProfile(me.userId), wallet: me.wallet };
 }

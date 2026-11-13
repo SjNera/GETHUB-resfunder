@@ -11,6 +11,9 @@ import { parseResponseId, readJson, respond, safeErrorText, STATUS_BY_CODE } fro
 import { getLog } from './log';
 import { submitResponse } from './submit';
 import { listMyResponses } from './history';
+import { setMyPassword, type PasswordAuth } from './password';
+import { fastLineMs, getScreening } from './screening';
+import type { ScreeningRow } from './shapes';
 import { getMyProfile, saveMyProfile } from './profile';
 import { getSurveyDetails, listOpen, listSurveys, markSurveyClosed, parseSurveyId, pauseSurvey, registerSurvey } from './surveys';
 
@@ -490,6 +493,52 @@ describe('R8 log', () => {
   });
 });
 
+describe('screening details', () => {
+  beforeEach(register);
+
+  it('returns checks, the AI result with its flagged answers, and timing, newest first', async () => {
+    const flagged = [{ questionId: 'q7', label: 'unclear' as const, type: 'other' as const, injection: false, agreed: false, reason: 'The AI check was inconclusive.' }];
+    const review = await submitResponse(await submitBody(privateKeyToAccount(generatePrivateKey())));
+    db.patchResponse(review.responseId, { startedAt: new Date(Date.now() - 200_000), submittedAt: new Date(Date.now() - 10_000) });
+    await db.insertDecision({
+      responseId: review.responseId, result: 'review', reasons: ['x'], reasonHash: TX_LOWER,
+      signals: { hardFails: [], weak: ['too_fast'] },
+      ai: Object.assign({ label: 'unclear' as const, type: 'other' as const, injection: false, reason: 'The AI check was inconclusive.', agreed: false }, { flagged }),
+      llmModel: 'm', rubricVersion: 'v1', status: 'off_chain',
+    });
+    const waiting = await submitResponse(await submitBody());
+
+    const res = await call(async () => getScreening(SURVEY_ID, await authHeaders(researcher, 'view_log', SURVEY_ID)));
+    expect(res.status).toBe(200);
+    const rows = res.json.rows as ScreeningRow[];
+    expect(rows.map((r) => r.responseId)).toEqual([waiting.responseId, review.responseId]);
+    expect(rows[1]).toEqual({
+      responseId: review.responseId,
+      durationMs: 190_000,
+      fastLineMs: 2000 * survey.questions.length,
+      screened: true,
+      hardFails: [],
+      weak: ['too_fast'],
+      ai: { label: 'unclear', type: 'other', injection: false, agreed: false, reason: 'The AI check was inconclusive.', flagged },
+    });
+    expect(rows[0]).toMatchObject({ screened: false, hardFails: [], weak: [], ai: null });
+  });
+
+  it('uses half the median of earlier responses once there are 10', () => {
+    expect(fastLineMs([10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 9)).toBe(27.5);
+    expect(fastLineMs([10, 20], 9)).toBe(18_000);
+  });
+
+  it('SURVEY_NOT_FOUND, WALLET_NOT_VERIFIED, NOT_YOUR_SURVEY', async () => {
+    expectError(await call(async () => getScreening(999, await authHeaders(researcher, 'view_log', 999))), 'SURVEY_NOT_FOUND');
+    expectError(await call(() => getScreening(SURVEY_ID, new Headers())), 'WALLET_NOT_VERIFIED');
+    expectError(
+      await call(async () => getScreening(SURVEY_ID, await authHeaders(respondent, 'view_log', SURVEY_ID))),
+      'NOT_YOUR_SURVEY',
+    );
+  });
+});
+
 describe('R9 closed', () => {
   beforeEach(register);
 
@@ -640,6 +689,7 @@ describe('profile', () => {
     expect(await call(() => saveMyProfile(new Headers(), { profile }))).toEqual({ status: 200, json: { saved: true } });
     await saveMyProfile(new Headers(), { profile: { ...profile, city: 'Taguig' } });
     expect((await getMyProfile(new Headers())).profile).toMatchObject({ city: 'Taguig', age: '18-24' });
+    expect((await getMyProfile(new Headers())).wallet).toBe(respondent.address.toLowerCase());
     sessionWallet.current = researcher.address.toLowerCase();
     expect((await getMyProfile(new Headers())).profile).toBeNull();
   });
@@ -652,5 +702,38 @@ describe('profile', () => {
     expectError(await call(() => saveMyProfile(new Headers(), { profile: { age: 'under_18' } })), 'INVALID_INPUT');
     expectError(await call(() => saveMyProfile(new Headers(), { nope: 1 })), 'INVALID_INPUT');
     expect((await getMyProfile(new Headers())).profile).toBeNull();
+  });
+});
+
+describe('password', () => {
+  afterEach(() => {
+    sessionWallet.current = null;
+  });
+  const fakeAuth = (setPassword: PasswordAuth['api']['setPassword']) => ({ api: { setPassword: vi.fn(setPassword) } });
+
+  it('sets the password on the signed-in account', async () => {
+    sessionWallet.current = respondent.address.toLowerCase();
+    const auth = fakeAuth(async () => ({ status: true }));
+    expect(await call(() => setMyPassword(new Headers(), { password: 'sampaguita24' }, auth))).toEqual({ status: 200, json: { saved: true } });
+    expect(auth.api.setPassword).toHaveBeenCalledWith({ body: { newPassword: 'sampaguita24' }, headers: expect.any(Headers) });
+  });
+
+  it('INVALID_INPUT for a short, long or missing password, and when one is already set', async () => {
+    sessionWallet.current = respondent.address.toLowerCase();
+    const ok = fakeAuth(async () => ({ status: true }));
+    expectError(await call(() => setMyPassword(new Headers(), { password: 'short' }, ok)), 'INVALID_INPUT');
+    expectError(await call(() => setMyPassword(new Headers(), { password: 'x'.repeat(129) }, ok)), 'INVALID_INPUT');
+    expectError(await call(() => setMyPassword(new Headers(), {}, ok)), 'INVALID_INPUT');
+    expect(ok.api.setPassword).not.toHaveBeenCalled();
+    const taken = fakeAuth(async () => {
+      throw Object.assign(new Error('User already has a password set'), { body: { code: 'PASSWORD_ALREADY_SET' } });
+    });
+    expectError(await call(() => setMyPassword(new Headers(), { password: 'sampaguita24' }, taken)), 'INVALID_INPUT');
+  });
+
+  it('WALLET_NOT_VERIFIED without a session', async () => {
+    const auth = fakeAuth(async () => ({ status: true }));
+    expectError(await call(() => setMyPassword(new Headers(), { password: 'sampaguita24' }, auth)), 'WALLET_NOT_VERIFIED');
+    expect(auth.api.setPassword).not.toHaveBeenCalled();
   });
 });

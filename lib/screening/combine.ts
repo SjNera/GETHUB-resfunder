@@ -25,6 +25,28 @@ export function combineRuns(runA: AiRun | null, runB: AiRun | null): AiResult {
   };
 }
 
+/** One open-ended answer the AI did not clear: not valid, flagged for injection, or the two runs split. */
+export interface AiFlag {
+  questionId: string;
+  label: AiLabel;
+  type: AiResult['type'];
+  injection: boolean;
+  agreed: boolean;
+  reason: string;
+}
+
+/** The AI result plus the answers it flagged. Stored as-is in decisions.ai_result. */
+export type AiResultWithFlags = AiResult & { flagged?: AiFlag[] };
+
+/** The answers that did not get a clean, agreed "valid", by question id, in survey order. */
+export function flaggedAnswers(questionIds: string[], results: AiResult[]): AiFlag[] {
+  return results.flatMap((r, i) =>
+    r.label !== 'valid' || r.injection || !r.agreed
+      ? [{ questionId: questionIds[i], label: r.label, type: r.type, injection: r.injection, agreed: r.agreed, reason: r.reason }]
+      : [],
+  );
+}
+
 const SEVERITY: Record<AiLabel, number> = { valid: 0, unclear: 1, non_answer: 2 };
 
 /**

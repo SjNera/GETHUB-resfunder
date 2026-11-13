@@ -1,4 +1,5 @@
-// Server only. Better Auth: email + wallet sign-in (SIWE), cookie sessions, tables in Postgres.
+// Server only. Better Auth: register with email + wallet (SIWE) + password, log in with email + password.
+// Cookie sessions, tables in Postgres.
 // Money actions still use the per-action wallet signature in lib/auth/signature.ts.
 import { betterAuth } from "better-auth";
 import { siwe } from "better-auth/plugins/siwe";
@@ -32,6 +33,9 @@ export function createAuth() {
     secret,
     database: getPool(),
     session: { expiresIn: 60 * 60 * 24 * 7 },
+    // Log in with email + password. Accounts are only created by the wallet sign-in (SIWE), so every
+    // user has a wallet; the password is added right after, through setPassword (lib/api/password.ts).
+    emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 8, maxPasswordLength: 128 },
     plugins: [
       siwe({
         domain: siweDomain(),

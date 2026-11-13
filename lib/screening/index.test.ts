@@ -75,7 +75,17 @@ describe('screen', () => {
     const out = await screenWith(input(CLEAN), deps(async () => ai).deps);
     expect(out.result).toBe('review');
     expect(out.reasons).toEqual(reasons);
-    expect(out.ai).toEqual(ai);
+    const { label, type, injection, agreed, reason } = ai;
+    expect(out.ai).toEqual({ ...ai, flagged: [{ questionId: 'q2', label, type, injection, agreed, reason }] });
+  });
+
+  it('records which answers the AI flagged, without changing the decision', async () => {
+    const d = deps(async (_q, a) => (a === 'none' ? NON_ANSWER : VALID));
+    const out = await screenWith(input({ ...CLEAN, q3: 'none' }), d.deps);
+    expect(out.result).toBe('review');
+    expect((out.ai as { flagged?: unknown } | null)?.flagged).toEqual([
+      { questionId: 'q3', label: 'non_answer', type: 'evasive', injection: false, agreed: true, reason: 'Filler only.' },
+    ]);
   });
 
   it('sets ai to null when there are no open-ended answers', async () => {

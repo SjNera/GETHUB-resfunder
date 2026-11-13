@@ -10,12 +10,13 @@ import { ESCROW_ADDRESS } from "@/lib/chain/abi";
 import { REJECT_REASONS } from "@/lib/review-reasons";
 import type { AuthProof, Hex, SurveyJson } from "@/lib/types";
 import { api, ApiClientError } from "@/lib/ui/api-client";
-import { authClient, signInWithWallet } from "@/lib/ui/auth/client";
+import { authClient, loginWithPassword, signInWithWallet } from "@/lib/ui/auth/client";
 import { getProvider } from "@/lib/ui/auth/metamask";
 import {
   bnb, chart, draftToSurvey, historyView, logView, openView, results, surveyCode, surveyView, toAnswerDraft, toEngineQuestions, total,
   type Chart, type EngineAnswers, type EngineDraft, type EngineHistory, type EngineLog, type EngineOpen, type EngineLogRow, type EngineQuestion, type EngineSurvey, type QuestionResult, type Range,
 } from "@/lib/ui/dashboard";
+import { explain } from "@/lib/ui/explain";
 import { addressUrl, shortHash, txUrl } from "@/lib/ui/format";
 import { parseSurveyRef } from "@/lib/ui/join";
 import { checkForm, isFinal } from "@/lib/ui/respond";
@@ -64,7 +65,8 @@ async function untilVerified<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
-export type Session = { email: string; wallet: string | null };
+/** onboard: signed in, but the sign-up questions are not answered yet. */
+export type Session = { email: string; wallet: string | null; onboard: boolean };
 export type Quote = {
   ok: boolean;
   errors: { total?: string; quota?: string; deadline?: string; survey?: string };
@@ -202,8 +204,23 @@ export function createBridge() {
         session = null;
         return null;
       }
-      const saved = read<{ email: string; wallet: string }>(WALLET_KEY);
-      let w: string | null = saved && saved.email === email ? saved.wallet : null;
+      let w: string | null = null;
+      let onboard = false;
+      try {
+        const p = await api.profile();
+        w = getAddress(p.wallet);
+        onboard = p.profile === null;
+      } catch (e) {
+        // A session without a wallet can't use the app: treat it as signed out.
+        if (e instanceof ApiClientError && e.code === "WALLET_NOT_VERIFIED") {
+          session = null;
+          return null;
+        }
+      }
+      if (!w) {
+        const saved = read<{ email: string; wallet: string }>(WALLET_KEY);
+        w = saved && saved.email === email ? saved.wallet : null;
+      }
       if (!w) {
         try {
           const accounts = (await getProvider()?.request({ method: "eth_accounts" })) as string[] | undefined;
@@ -212,15 +229,45 @@ export function createBridge() {
           /* no wallet yet: it is asked for at the first action */
         }
       }
-      session = { email, wallet: w };
+      session = { email, wallet: w, onboard };
       return session;
     },
 
-    /** Connect MetaMask and sign the free sign-in message. One prompt for the account, one for the signature. */
-    async signIn(email: string): Promise<Session> {
+    /** Register: connect MetaMask only (no signature yet). Returns the address to show. */
+    async connect(): Promise<string> {
+      return getAddress(await connectWallet());
+    },
+
+    /** Register: sign the free wallet message with the email, then add the password to that account. */
+    async register(email: string, password: string): Promise<Session> {
       const { wallet: w } = await signInWithWallet(email);
-      session = { email: email.trim().toLowerCase(), wallet: w };
-      write(WALLET_KEY, session);
+      try {
+        await api.setPassword(password);
+      } catch (e) {
+        // Leave no half-made session; registering again signs into the same account and retries.
+        await authClient.signOut().catch(() => undefined);
+        throw e;
+      }
+      const p = await api.profile().catch(() => null);
+      session = { email: email.trim().toLowerCase(), wallet: w, onboard: !p?.profile };
+      write(WALLET_KEY, { email: session.email, wallet: w });
+      surveys = null;
+      return session;
+    },
+
+    /** Log in with email and password. MetaMask is not opened. */
+    async login(email: string, password: string): Promise<Session> {
+      const { email: e } = await loginWithPassword(email, password);
+      let p: { profile: Record<string, unknown> | null; wallet: string };
+      try {
+        p = await api.profile();
+      } catch (err) {
+        await authClient.signOut().catch(() => undefined);
+        throw err;
+      }
+      const w = getAddress(p.wallet);
+      session = { email: e, wallet: w, onboard: p.profile === null };
+      write(WALLET_KEY, { email: e, wallet: w });
       surveys = null;
       return session;
     },
@@ -327,9 +374,15 @@ export function createBridge() {
       const surveyId = Number(id);
       const pending = read<PendingClose>(PENDING_CLOSE_KEY);
       if (pending && pending.surveyId === surveyId) await registerClose(pending).catch(() => undefined);
-      const [d, log] = await Promise.all([detailsOf(surveyId), readAuthed("view_log", surveyId, (proof) => api.log(surveyId, proof))]);
+      // The screening details ride on the same proof as the log. If they fail, the log still opens.
+      const [d, [log, scr]] = await Promise.all([
+        detailsOf(surveyId),
+        readAuthed("view_log", surveyId, (proof) => Promise.all([api.log(surveyId, proof), api.screening(surveyId, proof).catch(() => null)])),
+      ]);
       const now = Date.now();
       const view = logView(log, d.survey, now);
+      const byId = new Map((scr?.rows ?? []).map((r) => [r.responseId, r]));
+      for (const row of view.rows) row.x = explain(row.res, row.reasons, byId.get(row.key), d.survey.questions, row.a);
       return { survey: withQuestions(surveyView(log.survey, now), d), log: view, results: results(d.survey, view.rows) };
     },
 
