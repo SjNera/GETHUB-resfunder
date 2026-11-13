@@ -29,11 +29,9 @@ const I={check:sv('<path d="M3.5 8.5l3 3 6-7"/>'),x:sv('<path d="M4.5 4.5l7 7M11
   pen:sv('<path d="M10.5 2.5l3 3L6 13H3v-3z"/><path d="M9 4l3 3"/>'),pause:sv('<path d="M5.5 3.5v9M10.5 3.5v9"/>'),refund:sv('<path d="M3 6.5h7.5a3 3 0 010 6H6M5.5 3.5L2.5 6.5l3 3"/>'),send:sv('<path d="M14 2L7 9M14 2l-4.5 12L7 9 2 6.5z"/>')};
 const fx=I.wallet;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const peso=n=>{const v=Math.round(n)*0.0001;return (v>=100?Math.round(v).toLocaleString('en-PH'):String(+v.toFixed(5)))+' tBNB'};
 /* B is the bridge to the real app (bridge.ts): session, MetaMask, API. D is what it has loaded so far. */
 const B=bridge;
 const D={fee:'…',bal:'',list:false,listErr:'',ws:{},wsErr:{},pend:null,open:null,openErr:'',hist:null,histErr:''};
-const DEMO_WALLET='0x5d7e9a41c2b8f03e6d17a95b4c08e2f13ad6a03c';
 const shortW=w=>w.length>14?w.slice(0,6)+'…'+w.slice(-4):w;
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const fmtDate=d=>{const [y,m,dd]=String(d).split('-').map(Number);return y?MONTHS[m-1]+' '+dd+', '+y:d};
@@ -116,7 +114,8 @@ function render(){
   root.innerHTML=`<div class="shell"><aside class="side ${S.sideOpen?'open':''}" aria-label="Sidebar">${sideNav()}</aside><div class="scrimSide ${S.sideOpen?'open':''}" data-act="sideClose"></div><main class="main">${P()}</main></div>`;
   document.getElementById('drawerRoot').innerHTML=S.openRev?reviewPanel():'';
   document.getElementById('modalRoot').innerHTML=S.closeAsk?closeModal():'';
-  document.getElementById('svRoot').innerHTML=S.sv?vStudent():'';
+  {const old=document.querySelector('#svRoot .sv'),y=old?old.scrollTop:0,k=S.sv&&S.sv._k;document.getElementById('svRoot').innerHTML=S.sv?vStudent():'';
+    if(S.sv&&k!=null&&S.sv._k===k){const n=document.querySelector('#svRoot .sv');if(n)n.scrollTop=y}}
   try{const h=hashOf();if(location.hash!=='#'+h)history.replaceState(null,'','#'+h)}catch(e){}
 }
 function hashOf(){return S.page==='survey'?`survey-${S.sid}-${S.stab}`:S.page==='finance'?'finance-'+S.finsub:S.page}
@@ -582,67 +581,117 @@ function vHelp(){const f=[['How does screening decide who gets paid?','Code chec
   ['What happens to a response in review?','It stays unpaid and shows in the survey\'s review queue with the reason. You pay it, or reject it with a reason. Either way it is recorded on chain and can\'t be undone. Nothing is paid or rejected by itself.'],
   ['What does the fee cover?','A flat fee per response ('+D.fee+') covers the network cost of each payment decision and running the screening. It isn\'t refunded when you close a survey; unused budget is.'],['Is this real money?','No. ResFunder runs on BSC Testnet with tBNB test tokens.']];
   return header('','Help and support',`<a class="btn" href="${FLOWS}" target="_blank" rel="noopener">View user flows</a>`)+`<section class="card pad faq" style="max-width:820px">${f.map((x,i)=>`<details ${i?'':'open'}><summary>${x[0]}${I.down.replace('<svg','<svg style="width:16px;height:16px;flex:none"')}</summary><p>${x[1]}</p></details>`).join('')}</section>`}
-/* ================= student view (respondent phone) ================= */
-function phone(body,foot,back){return `<div class="phone"><div class="sbar3"><span>10:32</span><span>●●● ▮</span></div><div class="pban"><b>BSC Testnet</b> · test tokens only</div>
-  <div class="pnav"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>${back?`<button class="btn ghost back" data-rgo="${back}">${I.back}Back</button>`:''}</div><div class="pbody">${body}</div>${foot?`<div class="pfoot">${foot}</div>`:''}</div>`}
-/* Two ways in: live (a real survey and a real submission) and the researcher's preview of their own survey (nothing is sent). */
-function vStudent(){const R=S.sv,s=R.s,Q=s.q;let ph='';
-  const step=R.step,rate=typeof s.rate==='string'?s.rate:s.rate!=null?peso(s.rate):(()=>{const r=B.quote(s,fundIn(s)).rate;return r==='—'?'0 tBNB':r})();
-  const mins=s.mins||Math.max(1,Math.round(Q.length/2)),spots=s.slotsLeft!=null?s.slotsLeft:Math.max(0,(+s.quota||0)-(s.paid!=null?s.paid:s.resp||0)),closes=s.closesFull||fmtDate(s.deadline);
-  if(step==='intro')ph=phone(`<div class="intro"><div class="g">${esc(s.group||(s.code?s.code+' · ':'')+'Paid survey on BSC Testnet')}</div><h2>${esc(s.title||'Untitled survey')}</h2><p>${esc(s.desc||'')}</p><div class="s3"><div><b>${rate}</b><span>per valid answer</span></div><div><b>${mins}m</b><span>to complete</span></div><div><b>${spots}</b><span>paid spots left</span></div></div><div class="cl">Closes ${closes}</div></div>`,`<button class="btn dark block" data-rgo="${R.live?'consent':'verify'}">Start survey</button><span class="hint" style="text-align:center">${R.live?'Signed in as '+esc(me().email)+'.':'Respondents sign in with their email and wallet first.'}</span>`);
-  else if(step==='verify'){
-    if(R.verified)ph=phone(`<div class="res"><div class="icirc ic-ok">${I.check}</div><h2 class="ph1">Email verified</h2><p class="pp">${esc(R.email)} can be paid once for this survey.</p></div>`,`<button class="btn dark block" data-rgo="consent">Continue</button>`,'intro');
-    else ph=phone(`<h2 class="ph1">Your email</h2><p class="pp">One payout per respondent. Researchers never see your email.</p><div class="fld"><label for="rEmail">Email</label><input class="inp" id="rEmail" data-rin="email" type="email" placeholder="example@email.com" value="${esc(R.email)}"><div class="err" id="rEmailErr"></div></div><button class="btn ghost" style="align-self:flex-start;padding:8px 0" data-ract="demoEmail">Use a demo email</button>`,`<button class="btn dark block" data-ract="sendCode">Continue</button>`,'intro');}
-  else if(step==='consent'){const li=(ic,b,t)=>`<li><span class="ic">${ic}</span><span><b>${b}</b>${t}</span></li>`;
-    ph=phone(`<h2 class="ph1">Before you start</h2><p class="pp">Please read this. It takes 20 seconds.</p><ul class="blist">${li(I.doc,`${Q.length} question${Q.length===1?'':'s'}, about ${mins} minute${mins===1?'':'s'}`,'Nothing is sent until you press Submit.')}${li(I.shield,'Anonymous','Researchers see your answers and wallet, never your email.')}${li(I.wallet,`${rate} for a valid answer`,'Checked by code and AI. Unclear ones go to a person.')}</ul>
-      <label class="chk"><input type="checkbox" data-ragree="1" ${R.agree?'checked':''}><span>I'm 18 or older and agree to take part in this study.</span></label><div class="err" id="rAgreeErr" style="margin-top:6px"></div>`,`<button class="btn dark block" data-ract="agree">I agree, start</button>`,R.live?'intro':'verify');}
-  else if(step==='answer'){const i=R.qi,q=Q[i],a=R.ans[i];let inp='';
-    if(q.type==='mc')inp=q.opts.map((o,j)=>`<label class="ropt"><input type="radio" name="ra${i}" data-rans="${i}" data-v="${j}" ${a===j?'checked':''}>${esc(o)}</label>`).join('');
-    else if(q.type==='scale')inp=`<div class="gchips gscale" role="radiogroup" aria-label="Pick a number">${scaleVals(q).map(v=>`<label><input type="radio" name="ra${i}" data-rans="${i}" data-v="${v}" ${a===v?'checked':''}>${v}</label>`).join('')}</div>`;
-    else if(q.type==='cb')inp=q.opts.map((o,j)=>`<label class="ropt"><input type="checkbox" data-ransc="${i}" data-v="${j}" ${(a||[]).includes(j)?'checked':''}>${esc(o)}</label>`).join('');
-    else if(q.type==='grid')inp=q.rows.map((r,ri)=>`<div class="grow"><div class="gl">${esc(r)}</div><div class="gchips" role="radiogroup" aria-label="${esc(r)}">${q.cols.map((c,ci)=>`<label><input type="radio" name="ra${i}-${ri}" data-ransg="${i}" data-r="${ri}" data-v="${ci}" ${(a||{})[ri]===ci?'checked':''}>${c}</label>`).join('')}</div></div>`).join('');
-    else inp=q.type==='short'?`<input class="inp" data-ranst="${i}" placeholder="Your answer" value="${esc(a||'')}" aria-label="Your answer">`:`<textarea class="inp" data-ranst="${i}" rows="4" maxlength="5000" placeholder="Your answer" aria-label="Your answer">${esc(a||'')}</textarea>`;
-    ph=phone(`<div class="qprog"><span>Question ${i+1} of ${Q.length}</span><span>${q.req?'Required':'Optional'}</span></div><div class="qbar"><span style="width:${(i+1)/Q.length*100}%"></span></div><p class="aq">${esc(q.t||'Untitled question')}${q.req?' <span class="ast">*</span>':''}</p>${inp}<div class="err" id="rAnsErr" style="margin-top:8px"></div>`,
-      `<div class="two"><button class="btn" data-ract="prevQ" aria-label="Previous question">${I.back}</button><button class="btn dark" data-ract="nextQ">${i===Q.length-1?'Review and submit':'Next'}</button></div>`,'consent');}
-  else if(step==='wallet'){const txt=(q,i)=>{const a=R.ans[i];return q.type==='mc'?(a!=null?q.opts[a]:'—'):q.type==='scale'?(a!=null?String(a):'—'):q.type==='cb'?((a||[]).map(j=>q.opts[j]).join(', ')||'—'):q.type==='grid'?(Object.keys(a||{}).length+' of '+q.rows.length+' rows'):((a||'').trim()||'—')};
-    const sum=`<p class="lbl" style="margin:12px 0 6px">Your answers</p><div class="sumq">${Q.map((q,i)=>`<div><span>${i+1}. ${esc(q.t)}</span>${esc(txt(q,i))}</div>`).join('')}</div>`;
-    ph=R.live?phone(`<h2 class="ph1">Review and submit</h2><p class="pp">${rate} goes to your signed-in wallet if your answers pass the checks.</p><div class="rbox"><dl class="kv"><dt>Wallet</dt><dd class="mono">${esc(shortW(S.wallet))}</dd><dt>Email</dt><dd>${esc(me().email)}</dd></dl></div>${sum}<p class="hint" style="margin-top:10px">MetaMask asks for one free signature. It proves the answers come from your wallet.</p>`,`<button class="btn dark block" data-ract="submit">Submit answers</button>`,'answer')
-      :phone(`<h2 class="ph1">Where should we send ${rate}?</h2><p class="pp">Your BSC Testnet wallet address.</p><div class="fld"><label for="rW">Wallet address</label><input class="inp mono" id="rW" data-rin="wallet" placeholder="0x…" value="${esc(R.wallet)}"><div class="err" id="rWErr"></div></div><button class="btn ghost" style="align-self:flex-start;padding:8px 0" data-ract="demoW">Use a demo wallet</button>${sum}`,`<button class="btn dark block" data-ract="submit">Submit answers</button>`,'answer');}
-  else if(step==='screen'){const it=[['Code checks','Not empty, not gibberish, not a copy, not too fast',I.code],['AI label','Checks your written answers twice',I.ai],['Rule engine','Applies the published rules',I.rule]];
-    if(R.live){const run=R.phase==='screen';
-      ph=R.err?phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Couldn't submit</h2><p class="pp">${esc(R.err)}</p></div>`,`<button class="btn dark block" data-rgo="wallet">Back to your answers</button>`)
-        :phone(`<h2 class="ph1">${run?'Checking your answers':R.phase==='send'?'Sending your answers':'Confirm in MetaMask'}</h2><p class="pp">${run?'This takes a few seconds. Keep this open.':R.phase==='send'?'One moment.':'Sign the free message in MetaMask to send your answers.'}</p>
-          <ul class="slist">${it.map(x=>`<li class="${run?'run':''}"><span class="s">${run?I.spin:x[2]}</span><span><b>${x[0]}</b><small>${x[1]}</small></span></li>`).join('')}</ul>`,'');}
-    else{const done=R.stage>=3;ph=phone(`<h2 class="ph1">${done?'Done':'Checking your answers'}</h2><p class="pp">${done?'Here is your result.':'This takes a few seconds.'}</p>
-      <ul class="slist">${it.map((x,k)=>{const c=R.stage>k?'ok':R.stage===k?'run':'';return `<li class="${c}"><span class="s">${R.stage>k?I.check:R.stage===k?I.spin:x[2]}</span><span><b>${x[0]}</b><small>${x[1]}</small></span></li>`}).join('')}</ul>
-      <div class="demo"><span>Sample outcome</span><span class="seg" role="group" aria-label="Sample outcome">${[['pay','Pay'],['review','Review'],['nopay',"Don't pay"]].map(([v,l])=>`<button data-outcome="${v}" aria-pressed="${R.outcome===v}">${l}</button>`).join('')}</span></div>`,done?`<button class="btn dark block" data-rgo="${R.outcome}">See result</button>`:'');}}
-  else if(step==='pay'){const X=R.res;
-    ph=X?phone(`<div class="res"><div class="icirc ic-ok">${I.check}</div><h2 class="ph1">${X.amount} sent</h2><p class="pp">Your answers passed the screening check. Thank you.</p><div class="rbox"><dl class="kv"><dt>Amount</dt><dd>${X.amount}</dd><dt>To</dt><dd class="mono">${esc(X.wallet)}</dd>${X.tx?`<dt>Transaction</dt><dd class="mono">${X.tx}</dd>`:''}</dl></div></div>`,`${X.txUrl?`<a class="btn block" href="${X.txUrl}" target="_blank" rel="noopener">View on BscScan</a>`:''}<button class="btn dark block" data-ract="restart">Done</button>`)
-      :phone(`<div class="res"><div class="icirc ic-ok">${I.check}</div><h2 class="ph1">${rate} sent</h2><p class="pp">Your answers passed the screening check. Thank you.</p><div class="rbox"><dl class="kv"><dt>Amount</dt><dd>${rate}</dd><dt>To</dt><dd class="mono">${esc(shortW(R.wallet||DEMO_WALLET))}</dd><dt>Transaction</dt><dd class="mono">sample</dd></dl></div></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);}
-  else if(step==='review')ph=R.res?phone(`<div class="res"><div class="icirc ic-rev">${I.clock}</div><h2 class="ph1">Under review</h2><p class="pp">The researcher will decide.</p><div class="rbox"><ol class="tln"><li class="ok"><span class="d"></span><span><b>Submitted</b><small>Your answers were received</small></span></li><li class="now"><span class="d"></span><span><b>In review</b><small>The checks couldn't settle one answer</small></span></li><li><span class="d"></span><span><b>Decision</b><small>Made by the researcher</small></span></li></ol></div></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`)
-    :phone(`<div class="res"><div class="icirc ic-rev">${I.clock}</div><h2 class="ph1">Under review</h2><p class="pp">One answer was flagged, so the researcher will decide.</p><div class="rbox"><ol class="tln"><li class="ok"><span class="d"></span><span><b>Submitted</b><small>Your answers were received</small></span></li><li class="now"><span class="d"></span><span><b>In review</b><small>A researcher is checking your answer</small></span></li><li><span class="d"></span><span><b>Decision</b><small>Made by the researcher</small></span></li></ol></div></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);
-  else if(step==='nopay'){
-    if(R.res)ph=phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Not paid</h2><p class="pp">Your answers didn't pass the code checks.</p><div class="rbox">${(R.res.reasons.length?R.res.reasons:['A code check failed.']).map(x=>`<div class="quote" style="border-color:var(--line-2)">${esc(x)}</div>`).join('')}</div><p class="hint" style="margin-top:12px">This decision is recorded on chain.</p></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);
-    else{const qi=Math.max(0,Q.findIndex(isText)),a=((R.ans[qi]||'')+'').trim()||'asdf';
-      ph=phone(`<div class="res"><div class="icirc ic-no">${I.x}</div><h2 class="ph1">Not paid</h2><p class="pp">Your answer to question ${qi+1} didn't pass a code check.</p><div class="rbox"><div class="hint">${esc(Q[qi].t)}</div><div class="quote" style="border-color:var(--line-2)">“${esc(a)}”</div></div><p class="hint" style="margin-top:12px">This is a preview. A respondent also sees this screen when the researcher rejects an answer after review.</p></div>`,`<button class="btn dark block" data-ract="restart">Done</button>`);}}
-  const label=R.live?'Answering as a respondent · '+esc(me().email):'Preview · what respondents see · nothing is sent';
-  return `<div class="sv" role="dialog" aria-modal="true" aria-label="Respondent view"><div class="scr" data-act="closeSV"></div><div class="hdr">${I.eye.replace('<svg','<svg style="width:16px;height:16px"')}<span>${label}</span><button class="ibtn" data-act="closeSV" aria-label="Close respondent view">${I.x}</button></div>${ph}</div>`}
+/* ================= student view (respondent page) ================= */
+/* Three screens, like a form: (1) intro and consent, (2) every question on one page with Submit at the end,
+   (3) the result. A "ticket" anchors each screen: what the survey pays and how far along you are; at the end it is the receipt.
+   Desktop: the ticket is a sticky left column. Phone: it folds into a strip under the top bar (tap to open). */
+const SV_CHEV=sv('<path d="M10 3L5 8l5 5"/>'),SV_DOWN=sv('<path d="M4 6l4 4 4-4"/>'),SV_EXT=sv('<path d="M6 3.5h6.5V10M12.5 3.5L4 12"/>'),SV_ALERT=sv('<circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11h.01"/>'),SV_USER=sv('<circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5c.7-2.3 2.6-3.6 5-3.6s4.3 1.3 5 3.6"/>');
+const SV_KIND={mc:'Pick one',cb:'Pick any',scale:'Pick a number',grid:'One answer per row',short:'Short answer'};
+const SV_PHASE={sign:['Confirm in MetaMask…','Sign the free message in MetaMask to send your answers.'],send:['Sending your answers…','One moment.'],screen:['Checking your answers…','This takes a few seconds. Keep this open.']};
+/* An answer counts once it is complete (every grid row, a non-empty text). */
+const svDone=(q,a)=>q.type==='mc'||q.type==='scale'?a!=null:q.type==='cb'?(a||[]).length>0:q.type==='grid'?Object.keys(a||{}).length===q.rows.length:!!String(a||'').trim();
+const svCount=(Q,ans)=>Q.reduce((n,q,i)=>n+(svDone(q,ans[i])?1:0),0);
+function svInfo(R){const s=R.s,Q=s.q;
+  return {s,Q,n:Q.length,rate:typeof s.rate==='string'?s.rate:(()=>{const r=B.quote(s,fundIn(s)).rate;return r==='—'?'0 tBNB':r})(),
+    mins:s.mins||Math.max(1,Math.round(Q.length/2)),spots:s.slotsLeft!=null?s.slotsLeft:Math.max(0,(+s.quota||0)-(s.paid!=null?s.paid:s.resp||0)),
+    closes:s.closesFull||fmtDate(s.deadline),group:s.group||(s.code?s.code+' · ':'')+'Paid survey on BSC Testnet',title:s.title||'Untitled survey',
+    mode:R.live?'Answering as '+esc(me().email):'Preview · nothing is sent'}}
+/* The ticket: survey, payout, facts, perforation, then progress (or, after submitting, the receipt). */
+function svTicket(R,F){const step=R.step,X=R.res,a=svCount(F.Q,R.ans);
+  const dot=(st)=>st==='done'?`<span class="tk-dot ok" aria-hidden="true">${I.check}</span>`:st==='now'?`<span class="tk-dot now" aria-hidden="true"><i></i></span>`:`<span class="tk-dot" aria-hidden="true"></span>`;
+  const li=(st,label,meta,extra)=>`<li class="${st}">${dot(st)}<span class="tk-l">${label}</span>${meta!=null?`<span class="tk-m">${meta}</span>`:''}${extra||''}</li>`;
+  let amt,body,label='Your survey ticket',facts=true;
+  if(step==='pay'){label='Your payment receipt';facts=false;
+    amt=`<span class="tk-st ok">${I.check}Paid</span><b class="tk-v">${X.amount}</b>`;
+    body=`<dl class="tk-rows"><dt>To</dt><dd class="mono">${esc(X.wallet)}</dd><dt>Transaction</dt><dd class="mono">${X.tx?esc(X.tx):'—'}</dd><dt>Network</dt><dd>BSC Testnet</dd><dt>Checks</dt><dd>Code, AI label, rules</dd></dl>`}
+  else if(step==='review'){label='Your submission';facts=false;
+    amt=`<span class="tk-st rev">${I.clock}In review</span><b class="tk-v dim">${F.rate}</b><span class="tk-s">not paid yet</span>`;
+    body=`<ol class="tk-steps tk-tl">${li('done','Submitted',null,'<small>Your answers were received</small>')}${li('now rev','In review',null,'<small>A researcher is checking your answer</small>')}${li('','Decision',null,'<small>Made by the researcher</small>')}</ol>`}
+  else if(step==='nopay'){label='Why it wasn\'t paid';facts=false;
+    const why=X&&X.reasons&&X.reasons.length?X.reasons:['A code check failed.'];
+    amt=`<span class="tk-st no">${I.x}Not paid</span><b class="tk-v">0 tBNB</b>`;
+    body=`<div class="tk-why"><span class="tk-s">Reason</span>${why.map(w=>`<p>${SV_ALERT}<span>${esc(w)}</span></p>`).join('')}</div>`}
+  else{amt=`<span class="tk-s">You earn</span><b class="tk-v or">${F.rate}</b><span class="tk-s">for a valid answer</span>`;
+    const qs=step==='answer'?(R.sending?'done':'now'):'',bar=step==='answer'&&!R.sending?`<span class="tk-bar" aria-hidden="true"><i id="svTkBar" style="transform:scaleX(${F.n?a/F.n:0})"></i></span>`:'';
+    body=`<ol class="tk-steps" aria-label="Your progress">${li(step==='intro'?'now':'done','About and consent',step==='intro'?'Now':'Done')}${li(qs,'Questions',step==='answer'?`<span id="svTkAns">${a} of ${F.n} answered</span>`:F.n,bar)}${li(R.sending?'now':'','Submit',R.sending?'Sending':null)}${li('','Result')}</ol>`}
+  return `<aside class="tk" aria-label="${label}"><div class="tk-hd"><span class="tk-g">${esc(F.group)}</span><span class="tk-t">${esc(F.title)}</span></div>
+    <div class="tk-amt">${amt}</div>${facts?`<dl class="tk-facts"><div><dt>Time</dt><dd>About ${F.mins} min</dd></div><div><dt>Paid spots left</dt><dd>${F.spots}</dd></div><div><dt>Closes</dt><dd>${esc(F.closes)}</dd></div></dl>`:''}
+    <div class="tk-perf" aria-hidden="true"></div>${body}
+    <div class="tk-ft"><span><i class="tk-net" aria-hidden="true"></i><b>BSC Testnet</b> · test tokens only</span><span class="tk-mode">${I.eye}${F.mode}</span></div></aside>`}
+/* Page shell: top bar (phone: back · title · close, plus the ticket strip on the questions page), then ticket + content. */
+function svPage(F,o){const R=S.sv,a=svCount(F.Q,R.ans);
+  const key=R.step,anim=R._k!=null&&key!==R._k;R._k=key;
+  const back=o.back?`<button class="sv-hback" data-rgo="${o.back}" data-rdir="back" aria-label="Back">${SV_CHEV}</button>`:'';
+  const strip=R.step==='answer'?`<div class="sv-strip"><button class="sv-tkbtn" data-ract="tk" aria-expanded="${!!R.tkOpen}" aria-controls="svTk"><b>${F.rate}</b><span id="svAns">${a} of ${F.n} answered</span><span class="t">Ticket</span>${SV_DOWN}</button></div><div class="sv-prog" aria-hidden="true"><i id="svProg" style="transform:scaleX(${F.n?a/F.n:0})"></i></div>`:'';
+  return `<header class="sv-top"><div class="sv-topin">${back}<span class="brand"><span class="logo" aria-hidden="true"></span><span class="bt">ResFunder</span></span><span class="sv-ttl">${o.title||''}</span><span class="sv-mode">${R.live?SV_USER:I.eye}${F.mode}</span><button class="sv-close" data-act="closeSV" aria-label="Close survey">${I.x}<span>Close</span></button></div>${strip}</header>
+  <main class="sv-main"><div class="sv-grid${anim?(R._dir==='back'?' sv-back':' sv-fwd'):''}${R.tkOpen?' tk-open':''}" id="svTk">${svTicket(R,F)}<div class="sv-head">${o.back?`<button class="sv-cback" data-rgo="${o.back}" data-rdir="back">${SV_CHEV}Back</button>`:''}${o.head||''}</div><div class="sv-body">${o.body||''}</div></div></main>`}
+/* Close plays the sheet path in reverse, then clears the view. */
+function svClose(after){const R=S.sv;if(!R||R._closing)return;R._closing=true;clearT();
+  const done=()=>{if(S.sv===R){S.sv=null;render()}if(after)after()},el=document.querySelector('#svRoot .sv');
+  if(!el){done();return}el.classList.add('sv-out');setTimeout(done,200)}
+/* One question card. Answer inputs keep their data-rans* hooks; changing an answer never re-renders. */
+function svQuestion(q,i,F,a){const t=esc(q.t||'Untitled question'),req=q.req?' <span class="ast" aria-hidden="true">*</span><span class="vh"> (required)</span>':'';
+  const sub=`<p class="sv-qs">Question ${i+1} of ${F.n} · ${SV_KIND[q.type]||'Long answer'}</p>`,err=`<p class="sv-qerr" id="rAnsErr${i}" role="alert"></p>`;
+  if(q.type==='short'||isText(q)){const field=q.type==='short'?`<input class="inp" id="rqi${i}" data-ranst="${i}" placeholder="Your answer" value="${esc(a||'')}">`:`<textarea class="inp" id="rqi${i}" data-ranst="${i}" rows="4" maxlength="5000" placeholder="Your answer">${esc(a||'')}</textarea>`;
+    return `<section class="sv-q" id="rq${i}"><label class="sv-qt" for="rqi${i}">${t}${req}</label>${sub}${field}${err}</section>`}
+  let inp;
+  if(q.type==='mc')inp=`<div class="sv-opts">${q.opts.map((o,j)=>`<label class="sv-opt"><input type="radio" name="ra${i}" data-rans="${i}" data-v="${j}" ${a===j?'checked':''}><span class="rt">${esc(o)}</span><span class="ck" aria-hidden="true">${I.check}</span></label>`).join('')}</div>`;
+  else if(q.type==='cb')inp=`<div class="sv-opts">${q.opts.map((o,j)=>`<label class="sv-opt"><input type="checkbox" data-ransc="${i}" data-v="${j}" ${(a||[]).includes(j)?'checked':''}><span class="rt">${esc(o)}</span></label>`).join('')}</div>`;
+  else if(q.type==='scale')inp=`<div class="gchips gscale">${scaleVals(q).map(v=>`<label><input type="radio" name="ra${i}" data-rans="${i}" data-v="${v}" ${a===v?'checked':''}>${v}</label>`).join('')}</div>`;
+  else inp=q.rows.map((r,ri)=>`<div class="grow"><div class="gl">${esc(r)}</div><div class="gchips" role="radiogroup" aria-label="${esc(r)}">${q.cols.map((c,ci)=>`<label><input type="radio" name="ra${i}-${ri}" data-ransg="${i}" data-r="${ri}" data-v="${ci}" ${(a||{})[ri]===ci?'checked':''}>${esc(c)}</label>`).join('')}</div></div>`).join('');
+  return `<fieldset class="sv-q" id="rq${i}"><legend class="sv-qt">${t}${req}</legend>${sub}${inp}${err}</fieldset>`}
+/* Two ways in: live (a real survey and a real submission, ending on the server's result) and the researcher's
+   preview of their own survey (nothing is sent; it closes once the answers pass the completeness check). */
+function vStudent(){const R=S.sv,F=svInfo(R),step=R.step;let o;
+  if(step==='intro'){const li=(ic,b,t)=>`<li><span class="ic" aria-hidden="true">${ic}</span><span><b>${b}</b>${t}</span></li>`;
+    o={title:'',head:`<p class="sv-eye">Paid survey${F.s.code?' · '+esc(F.s.code):''}</p><h1 class="sv-h1">${esc(F.title)}</h1>${F.s.desc?`<p class="sv-lead">${esc(F.s.desc)}</p>`:''}`,
+      body:`<h2 class="sv-h2">Before you start</h2><p class="sv-sub">Please read this. It takes 20 seconds.</p>
+      <ul class="sv-list">${li(I.doc,`${F.n} question${F.n===1?'':'s'}, about ${F.mins} minute${F.mins===1?'':'s'}`,'Nothing is sent until you press Submit.')}${li(I.shield,'Anonymous','Researchers see your answers and wallet, never your email.')}${li(I.wallet,`${F.rate} for a valid answer`,'Checked by code and AI. Unclear ones go to a person.')}</ul>
+      <label class="sv-agree"><input type="checkbox" data-ragree="1" ${R.agree?'checked':''}><span>I'm 18 or older and agree to take part in this study.</span></label><p class="sv-qerr" id="rAgreeErr" role="alert"></p>
+      <div class="sv-actions"><button class="btn dark sv-cta" data-ract="agree">I agree, start</button><span class="sv-note">${R.live?'Signed in as '+esc(me().email):'Respondents sign in with their email and wallet first.'}</span></div>`}}
+  else if(step==='answer'){const ph=R.sending?SV_PHASE[R.phase]||SV_PHASE.screen:null,req=F.Q.some(q=>q.req);
+    const lead=R.live?`${F.rate} goes to your signed-in wallet if your answers pass the checks.`:'This is a preview. Nothing is sent.';
+    o={title:`${F.n} question${F.n===1?'':'s'}`,back:'intro',
+      body:`<div class="sv-form"><section class="sv-q sv-qh"><p class="sv-eye">${esc(F.group)}</p><h1 class="sv-h1 sm">${esc(F.title)}</h1>${F.s.desc?`<p class="sv-lead sm">${esc(F.s.desc)}</p>`:''}${req?`<p class="sv-reqnote">Required questions are marked <span class="ast">*</span></p>`:''}</section>
+      <fieldset class="sv-qs-all" ${R.sending?'disabled':''}>${F.Q.map((q,i)=>svQuestion(q,i,F,R.ans[i])).join('')}</fieldset>
+      <section class="sv-q sv-qsub"><h2 class="sv-qt">Submit your answers</h2><p class="sv-sub">${lead}</p><p class="sv-suberr" id="rSubErr" role="alert">${esc(R.err||'')}</p>
+      <div class="sv-actions in"><button type="button" class="btn dark sv-cta" data-ract="submit" ${R.sending?'disabled aria-busy="true"':''}>${ph?`<span class="sv-spin">${I.spin}</span>${ph[0]}`:'Submit answers'}</button><span class="sv-note" role="status">${ph?ph[1]:R.live?'MetaMask asks for one free signature. It proves the answers come from your wallet.':''}</span></div></section></div>`}}
+  else{const X=R.res,res=(ic,cls,h,p)=>`<div class="sv-res"><span class="sv-ic ${cls}" aria-hidden="true">${ic}</span><h1 class="sv-h1">${h}</h1><p class="sv-lead">${p}</p></div>`;
+    const done=`<button class="btn dark sv-cta" data-ract="restart">Done</button>`;
+    if(step==='pay')o={title:'Result',head:res(I.check,'ok',`${X.amount} sent`,'Your answers passed the screening check. Thank you.'),body:`<div class="sv-actions">${done}${X.txUrl?`<a class="btn sv-cta2" href="${X.txUrl}" target="_blank" rel="noopener">View on BscScan${SV_EXT}</a>`:''}</div>`};
+    else if(step==='review')o={title:'Result',head:res(I.clock,'rev','Under review','The checks couldn\'t settle one answer, so the researcher will decide.'),body:`<div class="sv-actions">${done}</div>`};
+    else o={title:'Result',head:res(I.x,'no','Not paid','Your answers didn\'t pass the code checks.'),body:`<div class="sv-actions">${done}</div>`}}
+  const cls=R._closing?' sv-out':R._shown?'':' sv-in';R._shown=true;
+  return `<div class="sv${cls}" data-step="${step}" role="dialog" aria-modal="true" aria-label="Answer survey">${svPage(F,o)}</div>`}
 let timers=[];const clearT=()=>{timers.forEach(clearTimeout);timers=[]};
-function runScreen(){clearT();const tick=()=>{if(!S.sv||S.sv.step!=='screen')return;S.sv.stage++;render();if(S.sv.stage<3)timers.push(setTimeout(tick,900));else timers.push(setTimeout(()=>{if(S.sv&&S.sv.step==='screen')rgo(S.sv.outcome)},900))};timers.push(setTimeout(tick,900))}
-function rgo(step){const R=S.sv;R.step=step;if(step==='screen'){R.stage=0;runScreen()}else clearT();
+function rgo(step,dir){const R=S.sv;R.step=step;R._dir=dir||'fwd';R.tkOpen=false;clearT();
   render()}
-/* The real submission: one signature, the answers, then the server's screening and its decision. */
-function submitLive(){const R=S.sv;if(R.sending)return;R.sending=true;R.step='screen';R.err='';R.phase='sign';clearT();render();
+/* After an answer changes: clear that card's error and update the answered counts, without re-rendering. */
+function svAnswered(i){const R=S.sv;if(!R)return;const F=svInfo(R),a=svCount(F.Q,R.ans),p=F.n?a/F.n:0;
+  const c=document.getElementById('rq'+i);if(c)c.classList.remove('bad');setErr('rAnsErr'+i,'');
+  if(!F.Q.some((q,k)=>q.req&&!svDone(q,R.ans[k])))setErr('rSubErr','');
+  [['svAns',a+' of '+F.n+' answered'],['svTkAns',a+' of '+F.n+' answered']].forEach(([id,t])=>{const e=document.getElementById(id);if(e)e.textContent=t});
+  ['svProg','svTkBar'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.transform='scaleX('+p+')'})}
+/* Submit-time check: every unanswered required card turns red; the page scrolls to the first one. */
+function svValidate(){const R=S.sv,Q=svInfo(R).Q;let first=-1,miss=0;
+  Q.forEach((q,i)=>{const bad=q.req&&!svDone(q,R.ans[i]),c=document.getElementById('rq'+i);if(c)c.classList.toggle('bad',bad);
+    setErr('rAnsErr'+i,bad?(q.type==='grid'?'Answer every row.':'This question is required'):'');if(bad){miss++;if(first<0)first=i}});
+  setErr('rSubErr',miss?`${miss} required question${miss===1?'':'s'} still need${miss===1?'s':''} an answer.`:'');
+  if(first>=0){const c=document.getElementById('rq'+first);if(c){let smooth=true;try{smooth=!matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){}
+    c.scrollIntoView({behavior:smooth?'smooth':'auto',block:'center'});const f=c.querySelector('input,textarea');if(f)try{f.focus({preventScroll:true})}catch(e){}}}
+  return !miss}
+/* The real submission: one signature, the answers, then the server's screening and its decision. The page stays put
+   and the Submit button shows each phase; only the outcome gets its own screen. */
+function submitLive(){const R=S.sv;if(R.sending)return;R.sending=true;R.err='';R.phase='sign';clearT();render();
   B.submit(R.sid,R.ans,R.startedAt,p=>{R.phase=p;if(S.sv===R)render()}).then(res=>{R.sending=false;R.res=res;S.answered[R.sid]=res.step;
-      if(S.sv===R){R.step=res.step;render()}else toast(res.step==='pay'?`${res.amount} sent to your wallet`:res.step==='review'?'Your answers are under review':'Your answers were not paid');
+      if(S.sv===R)rgo(res.step);else toast(res.step==='pay'?`${res.amount} sent to your wallet`:res.step==='review'?'Your answers are under review':'Your answers were not paid');
       loadBalance();loadHist()},
     e=>{R.sending=false;R.err=B.text(e);if(S.sv===R)render();else toast(R.err)})}
-const newSV=(sid,live)=>({sid,live:!!live,s:null,step:'intro',email:live?me().email:'',verified:false,agree:false,qi:0,ans:{},wallet:live?S.wallet:'',stage:0,outcome:'pay',res:null,err:'',phase:''});
+const newSV=(sid,live)=>({sid,live:!!live,s:null,step:'intro',agree:false,ans:{},wallet:live?S.wallet:'',res:null,err:'',phase:'',sending:false,tkOpen:false});
 /* ================= actions ================= */
 let tt,lastUndo=null;
 function toast(m,undo){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;document.getElementById('toastUndo').hidden=!undo;lastUndo=undo||null;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4000)}
 const setErr=(id,m)=>{const e=document.getElementById(id);if(e)e.textContent=m||''};
-const emailOk=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 function copy(v,msg){try{navigator.clipboard.writeText(v).then(()=>toast(msg),()=>toast(v))}catch(e){toast(v)}}
 function newDraft(){const dl=new Date(Date.now()+14*864e5),p=n=>String(n).padStart(2,'0');
   const d={id:'d'+Date.now().toString(36),status:'draft',title:'',desc:'',totalIn:'0.02',quota:10,deadline:`${dl.getFullYear()}-${p(dl.getMonth()+1)}-${p(dl.getDate())}`,q:[{t:'',type:'mc',req:true,opts:['Option 1','Option 2']}]};
@@ -676,7 +725,7 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'copyW':copy(el.dataset.w,'Wallet copied');break;
     case 'studentView':S.sv=Object.assign(newSV(S.sid,false),{s:SV(S.sid)});render();break;
     case 'openLink':openByLink(S.jLink,'link');break;
-    case 'closeSV':clearT();S.sv=null;render();break;
+    case 'closeSV':svClose();break;
     case 'addOpt':{const q=s.q[+el.dataset.i];if(q.opts.length>=12)return toast('A question can have up to 12 options');q.opts.push('Option '+(q.opts.length+1));saveDrafts();render();break;}
     case 'delOpt':{const q=s.q[+el.dataset.i];if(q.opts.length>2){q.opts.pop();saveDrafts();render()}break;}
     case 'addQ':if(s.q.length>=30)return toast('A survey can have up to 30 questions');s.q.push({t:'',type:'open',req:true,short:false});saveDrafts();render();{const i=document.getElementById('bq-'+(s.q.length-1));if(i)i.focus()}break;
@@ -711,24 +760,20 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'export':exportCsv(false);break;
     case 'exportPaid':exportCsv(true);break;
   }}
-function ract(a){const R=S.sv,Q=R.s.q;
+function ract(a){const R=S.sv;
   switch(a){
-    case 'demoEmail':R.email='maria.santos@email.com';render();break;
-    case 'sendCode':if(!emailOk(R.email))return setErr('rEmailErr','Enter a valid email, like example@email.com.');R.verified=true;rgo('consent');break;
-    case 'agree':if(!R.agree)return setErr('rAgreeErr','Tick the box to continue.');R.qi=0;rgo('answer');break;
-    case 'prevQ':if(R.qi>0){R.qi--;render()}else rgo('consent');break;
-    case 'nextQ':{const q=Q[R.qi],a=R.ans[R.qi];let ok=true;if(q.req){if(q.type==='mc'||q.type==='scale')ok=a!=null;else if(q.type==='cb')ok=(a||[]).length>0;else if(q.type==='grid')ok=Object.keys(a||{}).length===q.rows.length;else ok=!!(a||'').trim()}
-      if(!ok)return setErr('rAnsErr',q.type==='grid'?'Answer every row to continue.':'Answer this question to continue.');if(R.qi<Q.length-1){R.qi++;render()}else rgo('wallet');break;}
-    case 'demoW':R.wallet=DEMO_WALLET;render();break;
-    case 'submit':if(R.live){submitLive();break}
-      if(!/^0x[0-9a-fA-F]{40}$/.test((R.wallet||'').trim()))return setErr('rWErr','Enter a full wallet address (0x followed by 40 characters).');rgo('screen');break;
+    case 'agree':if(!R.agree)return setErr('rAgreeErr','Tick the box to continue.');rgo('answer');break;
+    case 'tk':R.tkOpen=!R.tkOpen;render();break;
+    case 'submit':if(R.sending||!svValidate())return;if(R.live){submitLive();break}
+      svClose(()=>toast('Preview finished. Nothing was sent.'));break;
     case 'restart':clearT();
-      if(R.live){const st=R.res&&R.res.step;S.sv=null;render();toast(st==='pay'?`${R.res.amount} sent to your wallet`:st==='review'?'Thanks. Your answers are under review.':'Thanks for answering');break}
-      Object.assign(R,{step:'intro',email:'',verified:false,agree:false,qi:0,ans:{},wallet:'',stage:0});render();break;
+      if(R.live){const st=R.res&&R.res.step;svClose(()=>toast(st==='pay'?`${R.res.amount} sent to your wallet`:st==='review'?'Thanks. Your answers are under review.':'Thanks for answering'));break}
+      Object.assign(R,{_dir:'back',step:'intro',agree:false,ans:{},res:null,err:'',sending:false,tkOpen:false});render();break;
   }}
 
+
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-nav],[data-act],[data-open],[data-openrev],[data-answer],[data-stab],[data-fsub],[data-rv],[data-ri],[data-range],[data-day],[data-step],[data-reason],[data-fres],[data-rgo],[data-ract],[data-outcome],[data-chk],[data-chkall],#toastUndo');
+  const t=e.target.closest('[data-nav],[data-act],[data-open],[data-openrev],[data-answer],[data-stab],[data-fsub],[data-rv],[data-ri],[data-range],[data-day],[data-step],[data-reason],[data-fres],[data-rgo],[data-ract],[data-chk],[data-chkall],#toastUndo');
   if(S.fOpen&&!e.target.closest('.fwrap')){S.fOpen=false;if(!t){render();return}}
   if(!t||t.disabled)return;const d=t.dataset;
   if(t.id==='toastUndo'){if(lastUndo){const f=lastUndo;lastUndo=null;f()}return}
@@ -747,9 +792,8 @@ document.addEventListener('click',e=>{
   if(d.step){const P=reviews(),i=P.findIndex(x=>x.key===S.openRev),j=i+(+d.step);if(i>=0&&j>=0&&j<P.length){S.openRev=P[j].key;render()}return}
   if(d.reason!=null){S.reason=d.reason;render();return}
   if(d.fres){S.lRes=d.fres;render();return}
-  if(d.rgo){rgo(d.rgo);return}
+  if(d.rgo){rgo(d.rgo,d.rdir);return}
   if(d.ract){ract(d.ract);return}
-  if(d.outcome){S.sv.outcome=d.outcome;render();return}
   if(d.act)act(d.act,t);
 });
 function refreshLog(){const b=document.getElementById('logBody');if(b)b.innerHTML=logBody();const x=document.getElementById('exportBtn');if(x)x.innerHTML=exportLabel()}
@@ -775,7 +819,7 @@ document.addEventListener('input',e=>{const t=e.target,d=t.dataset;if(!d)return;
   if(d.bq!=null){s.q[+d.bq].t=t.value;refreshPrev();saveDrafts();return}
   if(d.bopt!=null){s.q[+d.bopt].opts[+d.j]=t.value;refreshPrev();saveDrafts();return}
   if(d.rin){S.sv[d.rin]=t.value;['rEmailErr','rWErr'].forEach(x=>setErr(x,''));return}
-  if(d.ranst!=null){S.sv.ans[+d.ranst]=t.value;setErr('rAnsErr','');return}
+  if(d.ranst!=null){S.sv.ans[+d.ranst]=t.value;svAnswered(+d.ranst);return}
 });
 document.addEventListener('change',e=>{const el=e.target,d=el.dataset;if(!d)return;const s=SV(S.sid);
   if(d.pf){pf()[d.pf]=el.value;const k=d.pf;render();const o=document.querySelector('[data-pft="'+k+'O"]');if(o&&el.value==='other')o.focus();else{const r=document.querySelector('input[data-pf="'+k+'"][value="'+el.value+'"]');if(r)r.focus()}return}
@@ -789,13 +833,13 @@ document.addEventListener('change',e=>{const el=e.target,d=el.dataset;if(!d)retu
   if(d.breq!=null){s.q[+d.breq].req=el.checked;refreshPrev();saveDrafts();return}
   if(d.bshort!=null){s.q[+d.bshort].short=el.checked;saveDrafts();return}
   if(d.ragree){S.sv.agree=el.checked;setErr('rAgreeErr','');return}
-  if(d.rans!=null){S.sv.ans[+d.rans]=+d.v;setErr('rAnsErr','');return}
-  if(d.ransc!=null){const i=+d.ransc,a=new Set(S.sv.ans[i]||[]);el.checked?a.add(+d.v):a.delete(+d.v);S.sv.ans[i]=[...a].sort();setErr('rAnsErr','');return}
-  if(d.ransg!=null){const i=+d.ransg;S.sv.ans[i]=Object.assign({},S.sv.ans[i],{[d.r]:+d.v});setErr('rAnsErr','');return}
+  if(d.rans!=null){S.sv.ans[+d.rans]=+d.v;svAnswered(+d.rans);return}
+  if(d.ransc!=null){const i=+d.ransc,a=new Set(S.sv.ans[i]||[]);el.checked?a.add(+d.v):a.delete(+d.v);S.sv.ans[i]=[...a].sort();svAnswered(i);return}
+  if(d.ransg!=null){const i=+d.ransg;S.sv.ans[i]=Object.assign({},S.sv.ans[i],{[d.r]:+d.v});svAnswered(i);return}
 });
 document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.col');if(!c)return;const i=+c.dataset.day;if(i===S.day)return;S.day=i;refreshPlot()});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){if(S.closeAsk){if(!S.busy){S.closeAsk=false;render()}}else if(S.sv){clearT();S.sv=null;render()}else if(S.openRev){S.openRev=null;render()}else if(S.fOpen){S.fOpen=false;render()}else if(S.sideOpen){S.sideOpen=false;render()}return}
+  if(e.key==='Escape'){if(S.closeAsk){if(!S.busy){S.closeAsk=false;render()}}else if(S.sv){svClose()}else if(S.openRev){S.openRev=null;render()}else if(S.fOpen){S.fOpen=false;render()}else if(S.sideOpen){S.sideOpen=false;render()}return}
   if(e.key==='Enter'&&e.target.matches&&e.target.matches('input.inp,#jLink')){const m={aEmail:'authEmail',jLink:'openLink'}[e.target.id];if(m){e.preventDefault();act(m)}}
 });
 function fromHash(){const h=(location.hash||'').slice(1);if(!h||!S.authed)return;if(h.startsWith('survey-')){const [,sid,tab]=h.split('-');if(SV(sid)&&!(S.page==='survey'&&S.sid===sid&&S.stab===(tab||S.stab)))openSurvey(sid,tab)}else if(/^(dashboard|surveys|answer|settings|help)$/.test(h))S.page=h;else if(/^finance-(wallet|payouts|refunds)$/.test(h)){S.page='finance';S.finsub=h.slice(8)}}
