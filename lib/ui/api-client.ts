@@ -54,6 +54,9 @@ export const api = {
     call<{ saved: true }>("/api/me/profile", { method: "PUT", body: { profile } }),
   profile: () => call<{ profile: Record<string, unknown> | null; wallet: string }>("/api/me/profile"),
   setPassword: (password: string) => call<{ saved: true }>("/api/me/password", { method: "POST", body: { password } }),
+  resetStart: (email: string) => call<{ nonce: string }>("/api/password-reset", { method: "POST", body: { email } }),
+  resetConfirm: (body: { email: string; wallet: string; nonce: string; signature: Hex; password: string }) =>
+    call<{ reset: true }>("/api/password-reset/confirm", { method: "POST", body }),
   open: () => call<{ surveys: OpenSurvey[] }>("/api/surveys/open"),
   myResponses: () => call<{ responses: HistoryItem[] }>("/api/me/responses"),
   survey: (id: number) => call<SurveyDetails>(`/api/surveys/${id}`),

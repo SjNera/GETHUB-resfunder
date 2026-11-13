@@ -1081,6 +1081,7 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
 .au-ask{margin:-8px 0 16px}
 .au-form{display:grid;gap:16px}
 .au-form .fld>.hint{margin:0}
+.au-forgot{margin:-8px 0 0;text-align:right;font-size:14px}
 .au-pw{position:relative}
 .au-pw .inp{padding-right:72px}
 .au-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);min-height:38px;padding:0 12px;border:0;border-radius:10px;background:none;color:var(--muted);font-size:14px;font-weight:500;touch-action:manipulation}
