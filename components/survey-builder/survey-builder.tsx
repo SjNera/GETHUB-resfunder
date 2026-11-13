@@ -1,12 +1,9 @@
 "use client";
 
 import { Check, Plus } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { parseEther } from "viem";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { useAccount } from "@/lib/ui/auth/store";
-import { bnbAmount, shortHash } from "@/lib/ui/format";
 import {
   initialState,
   MAX_QUESTIONS,
@@ -15,13 +12,11 @@ import {
   validate,
   type BuilderState,
 } from "@/lib/ui/survey-builder";
-import { planFunding, type FundingPlan } from "@/lib/ui/survey-submit";
+import { FundStep } from "./fund-step";
 import { inputCls, QuestionCard } from "./question-card";
 import { SurveyPreview } from "./preview";
 
 const DRAFT_KEY = "rf-survey-draft-v1";
-/** Display estimate only. The real per-response fee is fixed server-side (FEE_PER_RESPONSE_WEI). */
-const FEE_ESTIMATE_WEI = parseEther("0.0002");
 
 function loadDraft(): BuilderState | null {
   try {
@@ -40,10 +35,6 @@ export function SurveyBuilder() {
   const hydrated = useRef(false);
   const [step, setStep] = useState<"build" | "fund">("build");
   const [tried, setTried] = useState(false);
-  const [fund, setFund] = useState({ rate: "0.001", quota: "100", deadline: "" });
-  const [fundTried, setFundTried] = useState(false);
-  const [nowMs, setNowMs] = useState(0);
-  const [plan, setPlan] = useState<FundingPlan | null>(null);
 
   useEffect(() => {
     const d = loadDraft();
@@ -56,10 +47,6 @@ export function SurveyBuilder() {
   }, [state]);
 
   const v = useMemo(() => validate(state), [state]);
-  const funding = useMemo(
-    () => (step === "fund" ? planFunding(v.survey, fund, FEE_ESTIMATE_WEI, nowMs) : null),
-    [step, v.survey, fund, nowMs],
-  );
   const errs = v.errors;
 
   if (ready && !account) {
@@ -74,7 +61,7 @@ export function SurveyBuilder() {
 
   const next = () => {
     setTried(true);
-    if (v.ok) { setNowMs(Date.now()); setStep("fund"); window.scrollTo({ top: 0 }); }
+    if (v.ok) { setStep("fund"); window.scrollTo({ top: 0 }); }
   };
 
   return (
@@ -123,45 +110,7 @@ export function SurveyBuilder() {
           </aside>
         </div>
       ) : (
-        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <section className="rounded-2xl border border-border bg-surface p-5">
-            <h2 className="text-lg font-semibold">Rate, quota and deadline</h2>
-            <p className="mt-1 text-sm text-muted">These are written into the contract and can’t change after funding.</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              {([["rate", "Pay per response (tBNB)", "text"], ["quota", "Responses wanted", "number"], ["deadline", "Deadline", "date"]] as const).map(([k, label, type]) => (
-                <div key={k}>
-                  <label htmlFor={`sb-${k}`} className="mb-2 block text-[15px] font-semibold">{label}</label>
-                  <input id={`sb-${k}`} type={type} className={inputCls} value={fund[k]}
-                    inputMode={k === "rate" ? "decimal" : undefined}
-                    onChange={(e) => { setFund({ ...fund, [k]: e.target.value }); setPlan(null); }} />
-                  {fundTried && funding && !funding.ok && funding.errors[k] && <p role="alert" className="mt-2 text-sm text-dontpay">{funding.errors[k]}</p>}
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 flex gap-2">
-              <Button variant="outline" onClick={() => setStep("build")}>Back to questions</Button>
-            </div>
-          </section>
-          <aside className="grid gap-4 self-start rounded-2xl border border-border bg-surface p-5">
-            <h2 className="text-lg font-semibold">Summary</h2>
-            {funding?.ok ? (
-              <dl className="grid gap-2 text-sm" data-testid="summary">
-                <div className="flex justify-between"><dt className="text-muted">Budget</dt><dd>{bnbAmount(funding.plan.budget, 6)} tBNB</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Fee (estimate)</dt><dd>{bnbAmount(funding.plan.fee, 6)} tBNB</dd></div>
-                <div className="flex justify-between border-t border-border pt-2 font-semibold"><dt>You deposit</dt><dd>{bnbAmount(funding.plan.deposit, 6)} tBNB</dd></div>
-              </dl>
-            ) : <p className="text-sm text-muted">Fill in the fields to see your deposit.</p>}
-            <Button variant="primary" onClick={() => { setFundTried(true); if (funding?.ok) setPlan(funding.plan); }}>Prepare funding</Button>
-            {plan && (
-              <div className="rounded-xl bg-surface-2 p-3 text-sm" data-testid="plan">
-                <p className="font-medium">Ready to lock</p>
-                <p className="mt-1 text-muted">Survey hash <span className="font-mono">{shortHash(plan.hash, 10, 6)}</span></p>
-                <p className="mt-1 text-muted">Sending the wallet transaction isn’t connected yet. It needs the deployed contract and the register route.</p>
-              </div>
-            )}
-            <Link href="/rubric" className="text-sm text-muted underline">How responses are screened</Link>
-          </aside>
-        </div>
+        <FundStep survey={v.survey} onBack={() => setStep("build")} onFunded={() => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } }} />
       )}
     </div>
   );
