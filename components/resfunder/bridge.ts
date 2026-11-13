@@ -8,7 +8,7 @@ import { getAddress, type Address } from "viem";
 import type { SurveyDetails } from "@/lib/api/shapes";
 import { ESCROW_ADDRESS } from "@/lib/chain/abi";
 import { REJECT_REASONS } from "@/lib/review-reasons";
-import type { Hex, SurveyJson } from "@/lib/types";
+import type { AuthProof, Hex, SurveyJson } from "@/lib/types";
 import { api, ApiClientError } from "@/lib/ui/api-client";
 import { authClient, signInWithWallet } from "@/lib/ui/auth/client";
 import { getProvider } from "@/lib/ui/auth/metamask";
@@ -119,6 +119,16 @@ export function createBridge() {
       write(WALLET_KEY, { email: session.email, wallet: w });
     }
     return w;
+  }
+
+  /** Researcher reads: the sign-in session first (no prompt); one signature only if the server asks for it. */
+  async function readAuthed<T>(action: "list_surveys" | "view_log", surveyId: number, run: (proof?: AuthProof) => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (e) {
+      if (!(e instanceof ApiClientError) || e.code !== "WALLET_NOT_VERIFIED") throw e;
+      return run(await signProof(action, surveyId, await wallet()));
+    }
   }
 
   async function fee(): Promise<bigint> {
@@ -306,8 +316,7 @@ export function createBridge() {
     /** The researcher's surveys. One free signature, reused for nine minutes. */
     async surveys(force = false): Promise<EngineSurvey[]> {
       if (surveys && !force) return surveys;
-      const w = await wallet();
-      const list = (await api.list(await signProof("list_surveys", 0, w))).surveys;
+      const list = (await readAuthed("list_surveys", 0, (proof) => api.list(proof))).surveys;
       const now = Date.now();
       surveys = list.map((s) => surveyView(s, now));
       return surveys;
@@ -316,11 +325,9 @@ export function createBridge() {
     /** Questions, decision log and results of one of the researcher's surveys. */
     async open(id: string): Promise<Workspace> {
       const surveyId = Number(id);
-      const w = await wallet();
       const pending = read<PendingClose>(PENDING_CLOSE_KEY);
       if (pending && pending.surveyId === surveyId) await registerClose(pending).catch(() => undefined);
-      const proof = await signProof("view_log", surveyId, w);
-      const [d, log] = await Promise.all([detailsOf(surveyId), api.log(surveyId, proof)]);
+      const [d, log] = await Promise.all([detailsOf(surveyId), readAuthed("view_log", surveyId, (proof) => api.log(surveyId, proof))]);
       const now = Date.now();
       const view = logView(log, d.survey, now);
       return { survey: withQuestions(surveyView(log.survey, now), d), log: view, results: results(d.survey, view.rows) };
