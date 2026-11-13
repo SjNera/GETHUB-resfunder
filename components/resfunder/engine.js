@@ -295,7 +295,7 @@ function vSurvey(){
       :`<div class="card empty"><h3>Opening the survey</h3><p>MetaMask may ask for a free signature. Only the researcher can read a survey's decisions.</p></div>`)}
   const nr=reviews().filter(r=>r.sid===s.id).length;
   const live=s.status==='live';if(S.stab==='share'&&!live)S.stab='overview';
-  const tabs=[['overview','Overview'],...(live?[['share','Live & share']]:[]),['queue','Review queue',nr],['log','Decision log'],['results','Results'],['questions','Questions'],['settings','Settings']];
+  const tabs=[['overview','Overview'],...(live?[['share','Share']]:[]),['queue','Review queue',nr],['log','Decision log'],['results','Results'],['questions','Questions'],['settings','Settings']];
   const clock=I.clock.replace('<svg','<svg style="width:15px;height:15px"');
   const meta=(s.status==='closed'?'<span>Closed</span>':s.ended?`<span>${clock} Deadline passed ${s.closesFull}</span>`:`<span>${clock} Closes ${s.closes} · ${s.left} left</span>`)+(s.paused&&s.status!=='closed'?' <span class="pill p-rev">New answers paused</span>':'');
   const T={overview:sOverview,share:sShare,queue:sQueue,log:sLog,results:sResults,questions:sQuestions,settings:sSettings}[S.stab]||sOverview;
@@ -461,11 +461,11 @@ function vFund(s){const Q=B.quote(s,fundIn(s)),busy=FUNDL[S.busy]?S.busy:'',dis=
       <div class="tot"><span style="font-weight:600">You deposit</span><b id="sD">${Q.deposit}</b></div><p class="hint" id="sLo" style="margin:8px 0 0"${Q.leftover?'':' hidden'}>${Q.leftover?'Rounding keeps '+Q.leftover+' in your wallet.':''}</p><p class="hint" style="margin:8px 0 0">Paid in tBNB from ${S.wallet?shortW(S.wallet):'your wallet'}. The fee isn't refundable; unused budget is.</p>
       <button class="fundbtn" data-act="fund" ${busy?'disabled aria-busy="true"':''}><span class="fx">${fx}</span><span id="fundLbl">${busy?FUNDL[busy]:'Fund survey'+(Q.ok?' '+Q.deposit:'')}</span></button>
       <p class="fundnote">Opens MetaMask to approve and lock the budget in one step.</p></aside></div>`}
-/* Live & share: the step right after funding (F = the funding result), and later the workspace tab (no F). */
+/* Live & share: the step right after funding (F = the funding result), and later the Share tab (no F). */
 const shareLink=id=>(S.launched[id]&&S.launched[id].link)||`${location.origin}/s/${id}`;
 function shareBody(s,F){const link=shareLink(s.id);
-  return (F?`<div class="lockbar">${I.lock}<span><b>Budget locked · ${F.deposit} in the contract</b><br><span style="font-size:13.5px">${F.budget} for answers and ${F.fee} fee. Your survey is live.</span></span><a class="mono" href="${F.txUrl}" target="_blank" rel="noopener">Tx ${F.tx}</a></div>`:'')+
-  `<div class="lockrow"><div>${I.lock}Rate<b>${s.rate} per answer</b></div><div>${I.lock}Quota<b>${s.quota} responses</b></div><div>${I.lock}Deadline<b>${s.closesFull}</b></div><div>${I.lock}Questions<b>${(s.q||[]).length} locked</b></div></div>
+  return (F?`<div class="lockbar">${I.lock}<span><b>Budget locked · ${F.deposit} in the contract</b><br><span style="font-size:13.5px">${F.budget} for answers and ${F.fee} fee. Your survey is live.</span></span><a class="mono" href="${F.txUrl}" target="_blank" rel="noopener">Tx ${F.tx}</a></div>
+  <div class="lockrow"><div>${I.lock}Rate<b>${s.rate} per answer</b></div><div>${I.lock}Quota<b>${s.quota} responses</b></div><div>${I.lock}Deadline<b>${s.closesFull}</b></div><div>${I.lock}Questions<b>${(s.q||[]).length} locked</b></div></div>`:'')+`
   <div class="share"><section class="card pad"><h2 class="h">Share the link</h2><p class="muted" style="margin:0">Respondents open it, sign in with their email and wallet, then answer.</p>
       <div class="linkbox"><input class="inp" id="shareLink" readonly value="${esc(link)}" aria-label="Share link"><button class="btn dark" data-act="copyLink">${I.link}Copy</button></div>
       <div class="row" style="margin-top:20px"><button class="btn" data-act="studentView">${I.eye}Preview as a respondent</button>${F?`<button class="btn dark pill" data-act="toOverview">Go to overview ${I.arrow}</button>`:''}</div></section>
