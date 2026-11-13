@@ -14,6 +14,8 @@
     "check": "next typegen && tsc --noEmit && vitest run",
     "test:chain": "cd contracts && npx hardhat build && cd .. && vitest run --config vitest.chain.config.mts",
     "db:apply": "node --env-file=.env scripts/apply-schema.mjs",
+    "auth:smoke": "node --env-file-if-exists=.env --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve.mjs scripts/auth-smoke.ts",
+    "db:apply:auth": "node --env-file=.env scripts/apply-auth-schema.mjs",
     "eval": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/eval.ts"
   },
   "dependencies": {
@@ -22,12 +24,14 @@
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@tanstack/react-query": "^5.107.1",
+    "better-auth": "^1.7.22",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "groq-sdk": "^1.6.0",
     "lucide-react": "^1.72.0",
     "next": "^16.4.6",
     "next-themes": "^0.4.6",
+    "pg": "^8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0",
@@ -39,6 +43,7 @@
   "devDependencies": {
     "@tailwindcss/turbopack": "^4.3.3",
     "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.187.0",
