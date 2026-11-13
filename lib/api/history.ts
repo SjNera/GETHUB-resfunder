@@ -7,7 +7,7 @@ export async function listMyResponses(headers: Headers): Promise<{ responses: Hi
   const me = await requireSession(headers);
   const rows = await listResponsesByWallet(me.wallet);
   return {
-    responses: rows.map(({ response, surveyTitle, rateWei, decision }) => ({
+    responses: rows.map(({ response, surveyTitle, rateWei, decision, appeal }) => ({
       responseId: response.id,
       surveyId: response.surveyId,
       surveyTitle,
@@ -18,6 +18,9 @@ export async function listMyResponses(headers: Headers): Promise<{ responses: Hi
       reasons: decision?.reasons ?? [],
       txHash: decision?.txHash ?? null,
       explorerUrl: explorerUrl(decision?.txHash ?? null),
+      appeal,
+      // A rejection by the researcher is saved off chain, so the contract still allows a payment later.
+      canAppeal: appeal === null && response.status === 'blocked' && decision?.result === 'dont_pay' && decision.status === 'off_chain',
     })),
   };
 }

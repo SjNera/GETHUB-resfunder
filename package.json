@@ -16,6 +16,7 @@
     "db:apply": "node --env-file=.env scripts/apply-schema.mjs",
     "auth:smoke": "node --env-file-if-exists=.env --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve.mjs scripts/auth-smoke.ts",
     "db:apply:auth": "node --env-file=.env scripts/apply-auth-schema.mjs",
+    "db:apply:app": "node --env-file=.env scripts/apply-app-schema.mjs",
     "eval": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/eval.ts"
   },
   "dependencies": {

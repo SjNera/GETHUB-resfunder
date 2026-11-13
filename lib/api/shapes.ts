@@ -46,6 +46,18 @@ export interface HistoryItem {
   reasons: string[];
   txHash: Hex | null;
   explorerUrl: string | null;
+  /** The respondent's appeal, if any. */
+  appeal: 'open' | 'paid' | 'kept' | null;
+  /** True after a rejection by the researcher that has not been appealed yet. */
+  canAppeal: boolean;
+}
+
+/** An appeal on one of a researcher's surveys (GET /api/surveys/[id]/appeals). */
+export interface AppealItem {
+  responseId: string;
+  text: string;
+  status: 'open' | 'paid' | 'kept';
+  createdAt: string;
 }
 
 export interface SurveyDetails {

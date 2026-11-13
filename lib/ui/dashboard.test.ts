@@ -128,12 +128,14 @@ describe("open surveys and my responses", () => {
       responseId: id, surveyId: 12, surveyTitle: "Study habits", rateWei: "1000000000000000", submittedAt: "2026-11-13T03:00:00Z",
       status, result: null, reasons: status === "blocked" ? ["An open-ended answer was not readable text."] : [],
       txHash: tx ? (`0x${"ab".repeat(32)}` as `0x${string}`) : null, explorerUrl: tx ? `https://testnet.bscscan.com/tx/0x${"ab".repeat(32)}` : null,
+      appeal: null, canAppeal: status === "blocked",
     });
     const v = historyView([item("a", "paid", "x"), item("b", "paid", "x"), item("c", "blocked", null), item("d", "review", null)], NOW);
     expect(v.earned).toBe("0.002 tBNB");
     expect(v.paid).toBe(2);
     expect(v.rows.map((r) => [r.res, r.amount])).toEqual([["pay", "0.001 tBNB"], ["pay", "0.001 tBNB"], ["no", "0 tBNB"], ["review", "0 tBNB"]]);
     expect(v.rows[2].why).toBe("An open-ended answer was not readable text.");
+    expect(v.rows.map((r) => r.canAppeal)).toEqual([false, false, true, false]);
     expect(v.rows[0].txUrl).toContain("bscscan.com/tx/");
     expect(historyView([], NOW)).toEqual({ rows: [], earned: "0 tBNB", paid: 0 });
   });

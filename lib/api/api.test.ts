@@ -617,6 +617,7 @@ describe('my responses', () => {
       status: 'paid', result: 'pay', reasons: ['Passed all checks.'], txHash: TX_LOWER,
       explorerUrl: `https://testnet.bscscan.com/tx/${TX_LOWER}`,
     });
+    expect(json.responses[0]).toMatchObject({ appeal: null, canAppeal: false });
     expect(json.responses[0]).not.toHaveProperty('answers');
     expect(json.responses[0]).not.toHaveProperty('email');
 

@@ -4,8 +4,9 @@
 // The engine renders; everything that talks to the server, MetaMask or the chain goes through here.
 // Money is computed in wei (bigint) and handed to the engine as display strings.
 import { getAddress, type Address } from "viem";
-import type { SurveyDetails } from "@/lib/api/shapes";
+import type { AppealItem, SurveyDetails } from "@/lib/api/shapes";
 import { ESCROW_ADDRESS } from "@/lib/chain/abi";
+import { APPEAL_MAX_CHARS, APPEAL_MIN_CHARS, REJECT_REASONS } from "@/lib/review-reasons";
 import type { Hex, SurveyJson } from "@/lib/types";
 import { api, ApiClientError } from "@/lib/ui/api-client";
 import { authClient, signInWithWallet } from "@/lib/ui/auth/client";
@@ -74,7 +75,7 @@ export type Quote = {
 };
 export type FundPhase = "connecting" | "confirm" | "mining" | "registering";
 export type Funded = { survey: EngineSurvey & { q: EngineQuestion[]; desc: string }; tx: string; txUrl: string; link: string; budget: string; fee: string; deposit: string };
-export type Workspace = { survey: EngineSurvey & { q: EngineQuestion[]; desc: string }; log: EngineLog; results: QuestionResult[] };
+export type Workspace = { survey: EngineSurvey & { q: EngineQuestion[]; desc: string }; log: EngineLog; results: QuestionResult[]; appeals: AppealItem[] };
 export type AnswerSurvey = {
   id: string;
   real: true;
@@ -162,6 +163,8 @@ export function createBridge() {
 
   return {
     text,
+    rejectReasons: Object.entries(REJECT_REASONS) as [string, string][],
+    appealChars: { min: APPEAL_MIN_CHARS, max: APPEAL_MAX_CHARS },
     contract: ESCROW_ADDRESS ? shortHash(ESCROW_ADDRESS) : "",
     contractUrl: ESCROW_ADDRESS ? addressUrl(ESCROW_ADDRESS) : "",
     walletUrl: (w: string) => addressUrl(w),
@@ -300,10 +303,10 @@ export function createBridge() {
       const pending = read<PendingClose>(PENDING_CLOSE_KEY);
       if (pending && pending.surveyId === surveyId) await registerClose(pending).catch(() => undefined);
       const proof = await signProof("view_log", surveyId, w);
-      const [d, log] = await Promise.all([detailsOf(surveyId), api.log(surveyId, proof)]);
+      const [d, log, ap] = await Promise.all([detailsOf(surveyId), api.log(surveyId, proof), api.appeals(surveyId, proof)]);
       const now = Date.now();
       const view = logView(log, d.survey, now);
-      return { survey: withQuestions(surveyView(log.survey, now), d), log: view, results: results(d.survey, view.rows) };
+      return { survey: withQuestions(surveyView(log.survey, now), d), log: view, results: results(d.survey, view.rows), appeals: ap.appeals };
     },
 
     sum(list: EngineSurvey[], key: "paidOut" | "unused"): string {
@@ -312,6 +315,17 @@ export function createBridge() {
 
     chart(rows: EngineLogRow[], range: Range): Chart {
       return chart(rows, range, Date.now());
+    },
+
+    /** The researcher decides a response in review or an open appeal. Pay is sent by the agent wallet. */
+    async decide(responseId: string, decision: "pay" | "dont_pay", reason?: string): Promise<{ status: string; reasons: string[] }> {
+      const r = await api.decide(responseId, decision, reason);
+      return { status: r.status, reasons: r.reasons };
+    },
+
+    /** The respondent appeals a rejection. */
+    async appeal(responseId: string, text: string): Promise<void> {
+      await api.appeal(responseId, text);
     },
 
     /** Pause or resume payments. One free signature. */

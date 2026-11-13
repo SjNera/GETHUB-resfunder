@@ -18,6 +18,7 @@ import {
   markDecisionSent,
   type DecisionRow,
   type PriorResponse,
+  type ResponseRow,
 } from '../db/queries';
 import { screen } from '../screening';
 import type { Hex, ScreenInput, ScreenOutput, SurveyJson } from '../types';
@@ -168,18 +169,30 @@ export async function processResponse(responseId: string): Promise<ResponseResul
   });
   if (!decision || out.result === 'review') return currentResult(responseId);
 
+  // 6 to 8.
+  await sendAndSettle(decision, response, out.result, hash);
+
+  // 9.
+  return currentResult(responseId);
+}
+
+/**
+ * Steps 6 to 8 of R6, also used when a person decides a response (lib/payment/review.ts).
+ * The decision row is already saved as 'pending'. The hash is saved before waiting for the receipt.
+ */
+export async function sendAndSettle(
+  decision: Pick<DecisionRow, 'id' | 'result'>,
+  response: Pick<ResponseRow, 'surveyId' | 'wallet'>,
+  result: 'pay' | 'dont_pay',
+  hash: Hex,
+): Promise<void> {
   // 6. Send.
   let txHash: Hex;
   try {
-    txHash = await sendDecision({
-      surveyId: response.surveyId,
-      respondent: response.wallet,
-      decision: out.result,
-      reasonHash: hash,
-    });
+    txHash = await sendDecision({ surveyId: response.surveyId, respondent: response.wallet, decision: result, reasonHash: hash });
   } catch (err) {
     await failDecision(decision.id, safeErrorText(err, MAX_ERROR_CHARS));
-    return currentResult(responseId);
+    return;
   }
 
   // 7. Save the hash before waiting.
@@ -193,9 +206,6 @@ export async function processResponse(responseId: string): Promise<ResponseResul
     receipt = { state: 'pending' };
   }
   await applyReceipt(decision, receipt);
-
-  // 9.
-  return currentResult(responseId);
 }
 
 /** R7. If the decision is still 'sent', checks the receipt once before answering. */
