@@ -481,3 +481,33 @@ export async function listLogRecords(surveyId: number): Promise<LogRecord[]> {
           },
   }));
 }
+
+// ---------- Screening details (researcher review) ----------
+
+export interface ScreeningRecord {
+  responseId: string;
+  startedAt: Date;
+  submittedAt: Date;
+  signals: Signals | null;
+  /** The stored AI result; may carry `flagged` (lib/screening/combine.ts). */
+  ai: AiResult | null;
+}
+
+/** Each response's code checks, AI result and timing, newest first. */
+export async function listScreeningRecords(surveyId: number): Promise<ScreeningRecord[]> {
+  const rows = await query<Raw>(
+    `SELECT r.id, r.started_at, r.submitted_at, d.signals, d.ai_result
+     FROM responses r
+     LEFT JOIN decisions d ON d.response_id = r.id
+     WHERE r.survey_id = $1::bigint
+     ORDER BY r.submitted_at DESC, r.id`,
+    [String(surveyId)],
+  );
+  return rows.map((r) => ({
+    responseId: String(r.id),
+    startedAt: toDate(r.started_at),
+    submittedAt: toDate(r.submitted_at),
+    signals: (r.signals ?? null) as Signals | null,
+    ai: (r.ai_result ?? null) as AiResult | null,
+  }));
+}

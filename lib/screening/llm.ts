@@ -1,8 +1,7 @@
 // AI label via Groq (TDD 10.3). Server-only: never import from client components.
 import Groq from 'groq-sdk';
 import { z } from 'zod';
-import type { AiResult } from '../types';
-import { combineRuns, type AiRun } from './combine';
+import { combineRuns, withRuns, type AiResultWithRuns, type AiRun } from './combine';
 import { SYSTEM_PROMPT, buildUserMessage } from './prompt';
 
 export { combineAnswers, combineRuns, INCONCLUSIVE_REASON, type AiRun } from './combine';
@@ -99,15 +98,16 @@ export async function labelAnswer(
   question: string,
   answer: string,
   client?: ChatClient,
-): Promise<AiResult> {
+): Promise<AiResultWithRuns> {
   try {
     const model = llmModel();
-    if (!model) return combineRuns(null, null);
+    if (!model) return withRuns(combineRuns(null, null), null, null);
     const c = client ?? defaultClient();
     const user = buildUserMessage(question, answer);
     const [runA, runB] = await Promise.all([runOnce(c, model, user), runOnce(c, model, user)]);
-    return combineRuns(runA, runB);
+    // Both runs ride along so the researcher can see them; the decision uses only the combined fields.
+    return withRuns(combineRuns(runA, runB), runA, runB);
   } catch {
-    return combineRuns(null, null);
+    return withRuns(combineRuns(null, null), null, null);
   }
 }

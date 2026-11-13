@@ -47,8 +47,19 @@ describe('labelAnswer', () => {
     const { client, calls } = mockClient(VALID, VALID2);
     expect(await labelAnswer('Q?', 'An answer.', client)).toEqual({
       label: 'valid', type: null, injection: false, reason: 'A real answer.', agreed: true,
+      runs: [
+        { label: 'valid', type: null, injection: false, reason: 'A real answer.' },
+        { label: 'valid', type: null, injection: false, reason: 'Answers it.' },
+      ],
     });
     expect(calls).toHaveLength(2);
+  });
+
+  it('keeps both runs when they disagree, and null for a run that failed', async () => {
+    const { client } = mockClient(VALID, 'not json');
+    const r = await labelAnswer('Q?', 'a', client);
+    expect(r).toMatchObject(inconclusive(false));
+    expect(r.runs).toEqual([{ label: 'valid', type: null, injection: false, reason: 'A real answer.' }, null]);
   });
 
   it('sends two calls with temperature 0, JSON format, model, timeout and the prompt', async () => {
@@ -80,33 +91,33 @@ describe('labelAnswer', () => {
 
   it('is inconclusive when the runs disagree', async () => {
     const { client } = mockClient(VALID, NON);
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(false));
   });
 
   it('is inconclusive with one failed run, keeping the other injection', async () => {
     const { client } = mockClient(new Error('network'), INJ);
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(true));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(true));
   });
 
   it('is inconclusive with injection false when both runs fail', async () => {
     const { client } = mockClient(new Error('500'), new Error('500'));
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(false));
   });
 
   it('treats bad JSON as a failed run', async () => {
     const { client } = mockClient('not json {', VALID);
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(false));
   });
 
   it('treats a null content as a failed run', async () => {
     const { client } = mockClient(null, VALID);
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(false));
   });
 
   it('treats a schema-invalid reply as a failed run', async () => {
     const bad = j({ label: 'valid', type: 'evasive', injection: false, reason: 'x' });
     const { client } = mockClient(bad, bad);
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(false));
   });
 
   it('times out a run after 10 seconds', async () => {
@@ -119,7 +130,7 @@ describe('labelAnswer', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(done).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
-    expect(await p).toEqual(inconclusive(false));
+    expect(await p).toMatchObject(inconclusive(false));
     expect(calls[0][1]?.signal?.aborted).toBe(true);
   });
 
@@ -127,19 +138,19 @@ describe('labelAnswer', () => {
     const client: ChatClient = {
       chat: { completions: { create: () => { throw new Error('boom'); } } },
     };
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(false));
   });
 
   it('is inconclusive without calling the client when GROQ_MODEL is missing', async () => {
     vi.stubEnv('GROQ_MODEL', '');
     const { client, calls } = mockClient(VALID, VALID);
-    expect(await labelAnswer('Q?', 'a', client)).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a', client)).toMatchObject(inconclusive(false));
     expect(calls).toHaveLength(0);
   });
 
   it('does not throw with no client and no API key', async () => {
     vi.stubEnv('GROQ_API_KEY', '');
-    expect(await labelAnswer('Q?', 'a')).toEqual(inconclusive(false));
+    expect(await labelAnswer('Q?', 'a')).toMatchObject(inconclusive(false));
   });
 });
 

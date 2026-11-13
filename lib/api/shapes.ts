@@ -1,6 +1,6 @@
 // Lane C. Response shapes of the API routes. Source: docs/TDD.md section 7.
 // Types only, so the UI can import them.
-import type { Answers, DecisionResult, DecisionStatus, Hex, ResponseStatus, SurveyJson, SurveyStatus, WeiString } from '../types';
+import type { AiLabel, AiType, Answers, DecisionResult, DecisionStatus, HardFailCheck, Hex, ResponseStatus, SurveyJson, SurveyStatus, WeakSignal, WeiString } from '../types';
 
 export interface RegisterResult {
   surveyId: number;
@@ -112,4 +112,40 @@ export interface ClosedResult {
 
 export function explorerUrl(txHash: Hex | null): string | null {
   return txHash ? `https://testnet.bscscan.com/tx/${txHash}` : null;
+}
+
+// ---------- Screening details (added; not one of the TDD 7 routes) ----------
+
+/** What one AI run answered. Null: the call failed, timed out or the reply was not usable. */
+export type ScreeningRun = { label: AiLabel; type: AiType | null; injection: boolean; reason: string } | null;
+
+/** An open-ended answer the AI did not clear. */
+export interface ScreeningFlag {
+  questionId: string;
+  label: AiLabel;
+  type: AiType | null;
+  injection: boolean;
+  agreed: boolean;
+  reason: string;
+  /** Run 1 and run 2. Null for decisions screened before runs were saved. */
+  runs: ScreeningRun[] | null;
+}
+
+/** How one response was screened. Shown in the researcher's review drawer. */
+export interface ScreeningRow {
+  responseId: string;
+  /** Time from opening the survey to submitting it. */
+  durationMs: number;
+  /** Faster than this counted as "too fast" when it was screened. */
+  fastLineMs: number;
+  /** False while the response is still waiting for screening. */
+  screened: boolean;
+  hardFails: { check: HardFailCheck; questionId: string }[];
+  weak: WeakSignal[];
+  /** Null when the AI was not run (a hard fail, or no written answers). */
+  ai: { label: AiLabel; type: AiType | null; injection: boolean; agreed: boolean; reason: string; flagged: ScreeningFlag[] | null } | null;
+}
+
+export interface ScreeningResponse {
+  rows: ScreeningRow[];
 }

@@ -12,6 +12,7 @@ import type {
   NewSurvey,
   PriorResponse,
   ResponseRow,
+  ScreeningRecord,
   SurveyRow,
 } from './queries';
 
@@ -235,4 +236,14 @@ export async function listLogRecords(surveyId: number): Promise<LogRecord[]> {
     .filter((r) => r.surveyId === surveyId)
     .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
     .map((r) => ({ response: publicResponse(r), decision: decisions.find((d) => d.responseId === r.id) ?? null }));
+}
+
+export async function listScreeningRecords(surveyId: number): Promise<ScreeningRecord[]> {
+  return responses
+    .filter((r) => r.surveyId === surveyId)
+    .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
+    .map((r) => {
+      const d = decisions.find((x) => x.responseId === r.id);
+      return { responseId: r.id, startedAt: r.startedAt, submittedAt: r.submittedAt, signals: d?.signals ?? null, ai: d?.ai ?? null };
+    });
 }

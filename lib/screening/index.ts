@@ -2,7 +2,7 @@
 // Server-only: imports llm.ts.
 import type { AiResult, ScreenInput, ScreenOutput, Signals } from '../types';
 import { runChecks } from './checks';
-import { combineAnswers } from './combine';
+import { combineAnswers, flaggedAnswers, type AiResultWithFlags } from './combine';
 import { labelAnswer, llmModel } from './llm';
 import { RUBRIC_VERSION, decide } from './rules';
 
@@ -26,19 +26,23 @@ export async function screenWith(input: ScreenInput, deps: ScreenDeps): Promise<
 
     // AI runs only with no hard fails, for each open-ended question with a non-empty answer.
     if (signals.hardFails.length === 0) {
-      const items: { question: string; answer: string }[] = [];
+      const items: { id: string; question: string; answer: string }[] = [];
       for (const q of input.survey.questions) {
         if (q.type !== 'open_ended') continue;
         const raw = input.answers[q.id];
         if (raw === undefined) continue;
         const answer = String(raw);
         if (answer.trim().length === 0) continue;
-        items.push({ question: q.text, answer });
+        items.push({ id: q.id, question: q.text, answer });
       }
       if (items.length > 0) {
         model = deps.llmModel();
         const results = await Promise.all(items.map((i) => deps.labelAnswer(i.question, i.answer)));
-        ai = combineAnswers(results);
+        const combined = combineAnswers(results);
+        const flagged = flaggedAnswers(items.map((i) => i.id), results);
+        // The researcher's review shows which answers the AI flagged; it does not change the decision.
+        const withFlags: AiResultWithFlags | null = combined && flagged.length > 0 ? { ...combined, flagged } : combined;
+        ai = withFlags;
       }
     }
 

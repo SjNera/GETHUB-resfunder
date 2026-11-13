@@ -1,5 +1,5 @@
 // Browser-side client for the API routes (TDD section 7). Shapes come from lib/api/shapes.ts.
-import type { ClosedResult, HistoryItem, LogResponse, OpenSurvey, RegisterResult, ResponseResult, SubmitResult, SurveyDetails, SurveySummary } from "@/lib/api/shapes";
+import type { ClosedResult, HistoryItem, LogResponse, OpenSurvey, RegisterResult, ResponseResult, ScreeningResponse, SubmitResult, SurveyDetails, SurveySummary } from "@/lib/api/shapes";
 import type { Answers, ApiError, AuthProof, ErrorCode, Hex, SurveyJson, WeiString } from "@/lib/types";
 
 export class ApiClientError extends Error {
@@ -52,6 +52,8 @@ export const api = {
     call<ResponseResult>(`/api/responses/${encodeURIComponent(responseId)}/decide`, { method: "POST", body: { decision, reason } }),
   saveProfile: (profile: Record<string, unknown>) =>
     call<{ saved: true }>("/api/me/profile", { method: "PUT", body: { profile } }),
+  profile: () => call<{ profile: Record<string, unknown> | null; wallet: string }>("/api/me/profile"),
+  setPassword: (password: string) => call<{ saved: true }>("/api/me/password", { method: "POST", body: { password } }),
   open: () => call<{ surveys: OpenSurvey[] }>("/api/surveys/open"),
   myResponses: () => call<{ responses: HistoryItem[] }>("/api/me/responses"),
   survey: (id: number) => call<SurveyDetails>(`/api/surveys/${id}`),
@@ -60,6 +62,8 @@ export const api = {
   process: (responseId: string) => call<ResponseResult>(`/api/process/${encodeURIComponent(responseId)}`, { method: "POST" }),
   response: (responseId: string) => call<ResponseResult>(`/api/responses/${encodeURIComponent(responseId)}`),
   log: (id: number, proof?: AuthProof) => call<LogResponse>(`/api/surveys/${id}/log`, { headers: proof ? authHeaders(proof) : {} }),
+  screening: (id: number, proof?: AuthProof) =>
+    call<ScreeningResponse>(`/api/surveys/${id}/screening`, { headers: proof ? authHeaders(proof) : {} }),
   pause: (id: number, paused: boolean, auth: AuthProof) =>
     call<{ surveyId: number; paused: boolean }>(`/api/surveys/${id}/pause`, { method: "POST", body: { paused, auth } }),
   closed: (id: number, txHash: Hex) => call<ClosedResult>(`/api/surveys/${id}/closed`, { method: "POST", body: { txHash } }),
