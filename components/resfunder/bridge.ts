@@ -314,6 +314,14 @@ export function createBridge() {
       return chart(rows, range, Date.now());
     },
 
+    /** Pause or resume payments. One free signature. */
+    async pause(id: string, paused: boolean): Promise<void> {
+      const surveyId = Number(id);
+      const w = await wallet();
+      await api.pause(surveyId, paused, await signProof("pause", surveyId, w));
+      surveys = null;
+    },
+
     /** closeSurvey from the researcher's wallet, then register the close and the refund. */
     async close(id: string, onPhase: (p: "confirm" | "mining" | "registering") => void) {
       const surveyId = Number(id);

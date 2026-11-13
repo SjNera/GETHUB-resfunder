@@ -92,6 +92,13 @@ export async function setSurveyClosed(surveyId: number, refundedWei: bigint, clo
   patchSurvey(surveyId, { status: 'closed', refundedWei, closeTxHash });
 }
 
+export async function setSurveyPaused(surveyId: number, paused: boolean): Promise<boolean> {
+  const s = surveys.find((x) => x.surveyId === surveyId);
+  if (!s) return false;
+  s.paused = paused;
+  return true;
+}
+
 export async function insertResponse(r: NewResponse): Promise<string> {
   const clash = responses.some(
     (x) => x.surveyId === r.surveyId && (x.wallet === r.wallet.toLowerCase() || x.emailHash === r.emailHash),

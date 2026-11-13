@@ -1,18 +1,33 @@
 // Lane C. Survey pipelines: register (R2), list (R3), details (R4), closed (R9).
 // Source: docs/TDD.md sections 11.1, 11.6, 11.7. Server only.
 import { z } from 'zod';
-import { verifyResearcher } from '../auth/signature';
+import { SIGNATURE_RE, verifyAuth, verifyResearcher, WALLET_RE } from '../auth/signature';
 import { surveyHash } from '../canonical';
 import { readClosed, readSurveyCreated, type SurveyCreatedEvent } from '../chain/escrow';
-import { getSurvey, insertSurvey, listSurveysByResearcher, setSurveyClosed, type SurveyRow } from '../db/queries';
+import {
+  getSurvey,
+  insertSurvey,
+  listSurveysByResearcher,
+  setSurveyClosed,
+  setSurveyPaused,
+  type SurveyRow,
+} from '../db/queries';
 import { surveySchema } from '../survey-schema';
-import type { Hex, SurveyJson } from '../types';
+import type { AuthProof, Hex, SurveyJson } from '../types';
 import { ApiFailure } from './errors';
 import type { ClosedResult, RegisterResult, SurveyDetails, SurveySummary } from './shapes';
 
 const txHashSchema = z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'txHash must be a 32-byte hex string');
 const registerBodySchema = z.object({ txHash: txHashSchema, survey: surveySchema });
 const closedBodySchema = z.object({ txHash: txHashSchema });
+const pauseBodySchema = z.object({
+  paused: z.boolean(),
+  auth: z.object({
+    wallet: z.string().regex(WALLET_RE),
+    signature: z.string().regex(SIGNATURE_RE),
+    timestamp: z.number().int().positive(),
+  }),
+});
 
 /** Parses the [id] path segment of a survey route. */
 export function parseSurveyId(raw: string): number {
@@ -112,6 +127,19 @@ export async function getSurveyDetails(surveyId: number): Promise<SurveyDetails>
     paused: row.paused,
     slotsLeft: Math.max(0, row.quota - row.activeCount),
   };
+}
+
+/** R10. Server-only switch: stops new submissions (R5 answers SURVEY_PAUSED). Responses already received are still processed. */
+export async function pauseSurvey(surveyId: number, body: unknown): Promise<{ surveyId: number; paused: boolean }> {
+  const input = pauseBodySchema.parse(body);
+  const row = await getSurvey(surveyId);
+  if (!row) throw new ApiFailure('SURVEY_NOT_FOUND', 'Survey not found.');
+  const proof: AuthProof = { ...input.auth, signature: input.auth.signature as Hex };
+  const wallet = await verifyAuth(proof, 'pause', surveyId);
+  if (wallet !== row.researcher) throw new ApiFailure('NOT_YOUR_SURVEY', 'This survey belongs to another wallet.');
+  if (row.status === 'closed') throw new ApiFailure('SURVEY_CLOSED', 'This survey is closed.');
+  await setSurveyPaused(surveyId, input.paused);
+  return { surveyId, paused: input.paused };
 }
 
 /** R9. Verified from the Closed event. Safe to repeat. */

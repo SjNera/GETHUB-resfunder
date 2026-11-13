@@ -10,7 +10,7 @@ import { ERROR_CODES, type Answers, type AuthAction, type Hex, type SurveyJson }
 import { parseResponseId, readJson, respond, safeErrorText, STATUS_BY_CODE } from './errors';
 import { getLog } from './log';
 import { submitResponse } from './submit';
-import { getSurveyDetails, listSurveys, markSurveyClosed, parseSurveyId, registerSurvey } from './surveys';
+import { getSurveyDetails, listSurveys, markSurveyClosed, parseSurveyId, pauseSurvey, registerSurvey } from './surveys';
 
 vi.mock('../db/queries', () => import('../db/memory'));
 vi.mock('../chain/escrow', () => ({
@@ -508,5 +508,39 @@ describe('R9 closed', () => {
   it('SURVEY_NOT_FOUND and INVALID_INPUT', async () => {
     expectError(await call(() => markSurveyClosed(999, { txHash: CLOSE_TX })), 'SURVEY_NOT_FOUND');
     expectError(await call(() => markSurveyClosed(SURVEY_ID, { txHash: 'nope' })), 'INVALID_INPUT');
+  });
+});
+
+describe('R10 pause', () => {
+  beforeEach(register);
+  const pauseBody = async (account: PrivateKeyAccount, paused: boolean, surveyId = SURVEY_ID, action: AuthAction = 'pause') => ({
+    paused,
+    auth: await proof(account, action, surveyId),
+  });
+
+  it('pauses and resumes for the researcher, and a paused survey refuses new submissions', async () => {
+    expect(await call(async () => pauseSurvey(SURVEY_ID, await pauseBody(researcher, true)))).toEqual({
+      status: 200,
+      json: { surveyId: SURVEY_ID, paused: true },
+    });
+    expect((await getSurveyDetails(SURVEY_ID)).paused).toBe(true);
+    expectError(await call(async () => submitResponse(await submitBody())), 'SURVEY_PAUSED');
+    await pauseSurvey(SURVEY_ID, await pauseBody(researcher, false));
+    expect((await getSurveyDetails(SURVEY_ID)).paused).toBe(false);
+    expect(await submitResponse(await submitBody())).toHaveProperty('responseId');
+  });
+
+  it('NOT_YOUR_SURVEY for another wallet, WALLET_NOT_VERIFIED for a proof of another action or survey', async () => {
+    expectError(await call(async () => pauseSurvey(SURVEY_ID, await pauseBody(respondent, true))), 'NOT_YOUR_SURVEY');
+    expectError(await call(async () => pauseSurvey(SURVEY_ID, await pauseBody(researcher, true, SURVEY_ID, 'view_log'))), 'WALLET_NOT_VERIFIED');
+    expectError(await call(async () => pauseSurvey(SURVEY_ID, { paused: true, auth: await proof(researcher, 'pause', SURVEY_ID + 1) })), 'WALLET_NOT_VERIFIED');
+    expect((await getSurveyDetails(SURVEY_ID)).paused).toBe(false);
+  });
+
+  it('SURVEY_NOT_FOUND, SURVEY_CLOSED and INVALID_INPUT', async () => {
+    expectError(await call(async () => pauseSurvey(999, await pauseBody(researcher, true, 999))), 'SURVEY_NOT_FOUND');
+    expectError(await call(() => pauseSurvey(SURVEY_ID, { paused: 'yes' })), 'INVALID_INPUT');
+    db.patchSurvey(SURVEY_ID, { status: 'closed' });
+    expectError(await call(async () => pauseSurvey(SURVEY_ID, await pauseBody(researcher, true))), 'SURVEY_CLOSED');
   });
 });

@@ -265,7 +265,7 @@ function authAct(a){const A=S.auth;
 
 /* ================= dashboard ================= */
 function kpi(ic,v,small,smallCls,l,extra){return `<div class="card kpi"><span class="kic">${ic}</span><div class="v">${v}${small?`<small class="${smallCls}">${small}</small>`:''}</div><div class="l">${l}</div>${extra||''}</div>`}
-const stPill=s=>s.status==='draft'?'<span class="pill p-draft">Draft</span>':s.status==='closed'?'<span class="pill p-closed">Closed</span>':s.ended?'<span class="pill p-rev">Deadline passed</span>':'<span class="pill p-live">Live</span>';
+const stPill=s=>s.status==='draft'?'<span class="pill p-draft">Draft</span>':s.status==='closed'?'<span class="pill p-closed">Closed</span>':s.ended?'<span class="pill p-rev">Deadline passed</span>':s.paused?'<span class="pill p-rev">Paused</span>':'<span class="pill p-live">Live</span>';
 function surveyRow(s){
   const d=s.status==='draft',pct=d?0:Math.min(100,Math.round(s.paid/s.quota*100)),w=W(s.id),nr=w?w.log.sum.review:0;
   return `<tr><td><div class="nm"><b>${esc(s.title||'Untitled survey')}</b><small class="${d?'p':''}">${d?'Draft · saved in this browser':s.code}</small></div></td><td>${stPill(s)}${nr?` <span class="pill p-rev">${nr} in review</span>`:''}</td>
@@ -319,7 +319,7 @@ function vSurvey(){
   const nr=w.log.sum.review;
   const tabs=[['overview','Overview'],['queue','Review queue',nr],['log','Decision log'],['results','Results'],['questions','Questions'],['settings','Settings']];
   const clock=I.clock.replace('<svg','<svg style="width:15px;height:15px"');
-  const meta=s.status==='closed'?'<span>Closed</span>':s.ended?`<span>${clock} Deadline passed ${s.closesFull}</span>`:`<span>${clock} Closes ${s.closes} · ${s.left} left</span>`;
+  const meta=(s.status==='closed'?'<span>Closed</span>':s.ended?`<span>${clock} Deadline passed ${s.closesFull}</span>`:`<span>${clock} Closes ${s.closes} · ${s.left} left</span>`)+(s.paused&&s.status!=='closed'?' <span class="pill p-rev">New answers paused</span>':'');
   const T={overview:sOverview,queue:sQueue,log:sLog,results:sResults,questions:sQuestions,settings:sSettings}[S.stab]||sOverview;
   return header(crumb,esc(s.title),`<button class="btn" data-act="reopen">Refresh</button>${s.status==='live'?`<button class="btn dark" data-act="copyLink">${I.link}Copy share link</button>`:''}`)+
   `<div class="tabsrow"><div class="tabs" role="tablist">${tabs.map(([v,l,c])=>`<button role="tab" data-stab="${v}" aria-selected="${S.stab===v}">${l}${c?`<span class="cnt">${c}</span>`:''}</button>`).join('')}</div><div class="meta">${meta}</div></div>`+T(s,w);
@@ -433,7 +433,7 @@ function sSettings(s,w){const live=s.status==='live',m=w.log.sum;
       <dl class="kv"><dt>${I.lock.replace('<svg','<svg style="width:13px;height:13px"')} Pay per valid answer</dt><dd>${s.rate}</dd><dt>Quota</dt><dd>${s.quota} responses</dd><dt>Deadline</dt><dd>${s.closesFull}</dd><dt>Questions</dt><dd>${s.q.length}</dd>
         <dt>Contract</dt><dd class="mono"><a href="${B.contractUrl}" target="_blank" rel="noopener">${B.contract}</a></dd>${m.closeUrl?`<dt>Close transaction</dt><dd class="mono"><a href="${m.closeUrl}" target="_blank" rel="noopener">${m.closeTx}</a></dd>`:''}</dl></section>
     <section class="card pad"><h2 class="h">Controls</h2>
-      <div class="srow"><span><b>Pause payments</b> ${soon()}<small>Stops all payouts until you turn it back on. Responses are still collected.</small></span><label class="switch"><input type="checkbox" disabled aria-label="Pause payments, not connected yet"><span></span></label></div>
+      <div class="srow"><span><b>Pause new answers</b><small>Stops new submissions until you turn it back on. Answers already sent are still checked and paid.</small></span><label class="switch"><input type="checkbox" data-pause="${s.id}" ${s.paused?'checked':''} ${live&&!S.busy?'':'disabled'} aria-label="Pause new answers"><span></span></label></div>
       <div class="srow"><span><b>Close survey and refund</b><small>${live?'Stops new responses and returns the unused budget to your wallet.':'This survey is closed.'+(m.refunded?' '+m.refunded+' came back to your wallet.':'')}</small></span>${live?`<button class="btn red" data-act="askClose">${I.refund}Close survey</button>`:''}</div></section></div>`}
 function closeModal(){const w=W(S.sid),m=w.log.sum,busy=S.busy;
   const lbl={confirm:'Confirm in MetaMask…',mining:'Waiting for the network…',registering:'Recording the refund…'}[busy]||'Close and refund';
@@ -780,6 +780,9 @@ document.addEventListener('change',e=>{const el=e.target,d=el.dataset;if(!d)retu
   if(d.pfc){pf()[d.pfc]=el.checked;setErr('aPfErr','');return}
   if(el.id==='riSel'){S.ri=+el.value;render();return}
   if(el.id==='jQR'){const f=el.files&&el.files[0];el.value='';if(f)uploadQR(f);return}
+  if(d.pause){const id=d.pause,on=el.checked,w=W(id);if(S.busy){el.checked=!on;return}S.busy='pause';render();
+    B.pause(id,on).then(()=>{S.busy='';const sv=SV(id);if(sv)sv.paused=on;if(w)w.survey.paused=on;render();toast(on?'New answers paused':'New answers resumed');loadList(true)},
+      e=>{S.busy='';render();toast(B.text(e))});return}
   if(d.btype!=null){const q=s.q[+d.btype];q.type=el.value;if(q.type==='mc'&&!q.opts)q.opts=['Option 1','Option 2'];if(q.type==='scale'){q.min=1;q.max=5}saveDrafts();render();return}
   if(d.breq!=null){s.q[+d.breq].req=el.checked;refreshPrev();saveDrafts();return}
   if(d.bshort!=null){s.q[+d.bshort].short=el.checked;saveDrafts();return}

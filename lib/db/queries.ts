@@ -126,6 +126,15 @@ export async function setSurveyClosed(surveyId: number, refundedWei: bigint, clo
   );
 }
 
+/** Pause or resume payments for a survey. Returns false when the survey does not exist. */
+export async function setSurveyPaused(surveyId: number, paused: boolean): Promise<boolean> {
+  const rows = await query<Raw>(`UPDATE surveys SET paused = $2 WHERE survey_id = $1::bigint RETURNING survey_id`, [
+    String(surveyId),
+    paused,
+  ]);
+  return rows.length > 0;
+}
+
 // ---------- Responses ----------
 
 export interface ResponseRow {

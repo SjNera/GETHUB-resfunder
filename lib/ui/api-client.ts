@@ -54,6 +54,8 @@ export const api = {
   process: (responseId: string) => call<ResponseResult>(`/api/process/${encodeURIComponent(responseId)}`, { method: "POST" }),
   response: (responseId: string) => call<ResponseResult>(`/api/responses/${encodeURIComponent(responseId)}`),
   log: (id: number, proof: AuthProof) => call<LogResponse>(`/api/surveys/${id}/log`, { headers: authHeaders(proof) }),
+  pause: (id: number, paused: boolean, auth: AuthProof) =>
+    call<{ surveyId: number; paused: boolean }>(`/api/surveys/${id}/pause`, { method: "POST", body: { paused, auth } }),
   closed: (id: number, txHash: Hex) => call<ClosedResult>(`/api/surveys/${id}/closed`, { method: "POST", body: { txHash } }),
 };
 
