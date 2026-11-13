@@ -328,6 +328,11 @@ export function createBridge() {
       await api.appeal(responseId, text);
     },
 
+    /** Save the sign-up answers on the server (one profile per user). */
+    async saveProfile(profile: Record<string, unknown>): Promise<void> {
+      await api.saveProfile(profile);
+    },
+
     /** Pause or resume payments. One free signature. */
     async pause(id: string, paused: boolean): Promise<void> {
       const surveyId = Number(id);

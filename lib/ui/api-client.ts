@@ -13,7 +13,7 @@ export class ApiClientError extends Error {
   }
 }
 
-type Init = { method?: "GET" | "POST"; body?: unknown; headers?: Record<string, string> };
+type Init = { method?: "GET" | "POST" | "PUT"; body?: unknown; headers?: Record<string, string> };
 
 export function authHeaders(p: AuthProof): Record<string, string> {
   return { "x-auth-wallet": p.wallet, "x-auth-signature": p.signature, "x-auth-timestamp": String(p.timestamp) };
@@ -53,6 +53,8 @@ export const api = {
   appeal: (responseId: string, text: string) =>
     call<{ responseId: string }>(`/api/responses/${encodeURIComponent(responseId)}/appeal`, { method: "POST", body: { text } }),
   appeals: (id: number, proof: AuthProof) => call<{ appeals: AppealItem[] }>(`/api/surveys/${id}/appeals`, { headers: authHeaders(proof) }),
+  saveProfile: (profile: Record<string, unknown>) =>
+    call<{ saved: true }>("/api/me/profile", { method: "PUT", body: { profile } }),
   open: () => call<{ surveys: OpenSurvey[] }>("/api/surveys/open"),
   myResponses: () => call<{ responses: HistoryItem[] }>("/api/me/responses"),
   survey: (id: number) => call<SurveyDetails>(`/api/surveys/${id}`),

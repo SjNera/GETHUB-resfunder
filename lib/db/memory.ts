@@ -30,6 +30,7 @@ export function reset(): void {
   responses = [];
   decisions = [];
   appeals = [];
+  profiles.clear();
 }
 
 /** Test hook: edit a stored response (for example to age it). */
@@ -217,6 +218,16 @@ export async function reopenDecision(
   const r = responses.find((x) => x.id === row.responseId);
   if (r) r.status = d.status === 'pending' ? 'processing' : 'blocked';
   return { ...row };
+}
+
+const profiles = new Map<string, Record<string, unknown>>();
+
+export async function upsertProfile(userId: string, data: Record<string, unknown>): Promise<void> {
+  profiles.set(userId, JSON.parse(JSON.stringify(data)));
+}
+
+export async function getProfile(userId: string): Promise<Record<string, unknown> | null> {
+  return profiles.get(userId) ?? null;
 }
 
 export async function insertAppeal(responseId: string, text: string): Promise<AppealRow | null> {

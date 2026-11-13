@@ -436,6 +436,22 @@ export async function listSentDecisions(surveyId: number): Promise<DecisionRow[]
   return rows.map(mapDecision);
 }
 
+// ---------- Profiles ----------
+
+/** Sign-up answers of a user (the profiles table, lib/db/app-schema.sql). One row per user. */
+export async function upsertProfile(userId: string, data: Record<string, unknown>): Promise<void> {
+  await query(
+    `INSERT INTO profiles (user_id, data) VALUES ($1, $2::jsonb)
+     ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+    [userId, JSON.stringify(data)],
+  );
+}
+
+export async function getProfile(userId: string): Promise<Record<string, unknown> | null> {
+  const rows = await query<Raw>('SELECT data FROM profiles WHERE user_id = $1', [userId]);
+  return rows[0] ? (rows[0].data as Record<string, unknown>) : null;
+}
+
 // ---------- Appeals ----------
 
 export type AppealStatus = 'open' | 'paid' | 'kept';

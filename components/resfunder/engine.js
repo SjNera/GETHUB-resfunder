@@ -236,6 +236,7 @@ function authAct(a){const A=S.auth;
       if(s==='wallet'&&A.known)go2('email',0,'back');else if(s==='wallet')go2('setup',2,'back');else if(s==='setup')i===0?go2('who',0,'back'):go2('setup',i-1,'back');else go2('email',0,'back');return true}
     case 'connectMM':if(A.busy)return true;A.busy=true;A.err='';render();
       B.signIn(A.email).then(sess=>{A.busy=false;A.wallet={addr:sess.wallet,verified:true};S.wallet=sess.wallet;
+          if(!A.known){const P=pf();B.saveProfile({who:P.who,whoO:P.whoO,age:P.age,sex:P.sex,sexO:P.sexO,region:P.region,city:P.city,c1:!!P.c1,c2:!!P.c2,g1:P.g1,g1O:P.g1O,g2:P.g2,g2O:P.g2O}).catch(e=>toast("Couldn't save your profile: "+B.text(e)))}
           if(A.known){persist({done:true});enter(sess)}else{persist();render()}},
         e=>{A.busy=false;A.err=B.text(e);render()});return true;
     case 'authFinish':if(!A.wallet){setErr('aWalletErr','Connect MetaMask to finish setup.');return true}persist({done:true});go2('done');return true;

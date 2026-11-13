@@ -11,6 +11,7 @@ import { parseResponseId, readJson, respond, safeErrorText, STATUS_BY_CODE } fro
 import { getLog } from './log';
 import { submitResponse } from './submit';
 import { listMyResponses } from './history';
+import { getMyProfile, saveMyProfile } from './profile';
 import { getSurveyDetails, listOpen, listSurveys, markSurveyClosed, parseSurveyId, pauseSurvey, registerSurvey } from './surveys';
 
 vi.mock('../db/queries', () => import('../db/memory'));
@@ -21,7 +22,7 @@ vi.mock('../auth/session', () => ({
       const { ApiFailure } = await import('./errors');
       throw new ApiFailure('WALLET_NOT_VERIFIED', 'Sign in to continue.');
     }
-    return { userId: 'u1', email: 'x@example.com', wallet: sessionWallet.current };
+    return { userId: 'u-' + sessionWallet.current, email: 'x@example.com', wallet: sessionWallet.current };
   },
 }));
 vi.mock('../chain/escrow', () => ({
@@ -625,5 +626,32 @@ describe('my responses', () => {
     expect((await listMyResponses(new Headers())).responses).toHaveLength(1);
     sessionWallet.current = researcher.address.toLowerCase();
     expect((await listMyResponses(new Headers())).responses).toHaveLength(0);
+  });
+});
+
+describe('profile', () => {
+  afterEach(() => {
+    sessionWallet.current = null;
+  });
+  const profile = { who: 'student', age: '18-24', sex: 'female', region: 'NCR · Metro Manila', city: 'Makati', c1: true, c2: true, g1: 'college', g2: 'computing' };
+
+  it('saves, replaces and returns only the signed-in own profile', async () => {
+    sessionWallet.current = respondent.address.toLowerCase();
+    expect((await getMyProfile(new Headers())).profile).toBeNull();
+    expect(await call(() => saveMyProfile(new Headers(), { profile }))).toEqual({ status: 200, json: { saved: true } });
+    await saveMyProfile(new Headers(), { profile: { ...profile, city: 'Taguig' } });
+    expect((await getMyProfile(new Headers())).profile).toMatchObject({ city: 'Taguig', age: '18-24' });
+    sessionWallet.current = researcher.address.toLowerCase();
+    expect((await getMyProfile(new Headers())).profile).toBeNull();
+  });
+
+  it('WALLET_NOT_VERIFIED without a session, INVALID_INPUT for unknown fields, long text and under 18', async () => {
+    expectError(await call(() => saveMyProfile(new Headers(), { profile })), 'WALLET_NOT_VERIFIED');
+    sessionWallet.current = respondent.address.toLowerCase();
+    expectError(await call(() => saveMyProfile(new Headers(), { profile: { ...profile, admin: true } })), 'INVALID_INPUT');
+    expectError(await call(() => saveMyProfile(new Headers(), { profile: { city: 'x'.repeat(81) } })), 'INVALID_INPUT');
+    expectError(await call(() => saveMyProfile(new Headers(), { profile: { age: 'under_18' } })), 'INVALID_INPUT');
+    expectError(await call(() => saveMyProfile(new Headers(), { nope: 1 })), 'INVALID_INPUT');
+    expect((await getMyProfile(new Headers())).profile).toBeNull();
   });
 });
