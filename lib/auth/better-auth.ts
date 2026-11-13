@@ -7,8 +7,24 @@ import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
 import { verifyMessage } from "viem";
 
-export function appUrl(): string {
-  return (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+const https = (host: string | undefined) => (host ? `https://${host.replace(/^https?:\/\//, "")}` : null);
+
+/**
+ * The public address of the app. BETTER_AUTH_URL wins when set. On Vercel without it: the production
+ * domain in production, the branch URL on a preview. Local dev falls back to localhost.
+ */
+export function appUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const vercel =
+    env.VERCEL_ENV === "production"
+      ? https(env.VERCEL_PROJECT_PRODUCTION_URL) ?? https(env.VERCEL_URL)
+      : https(env.VERCEL_BRANCH_URL) ?? https(env.VERCEL_URL);
+  return (env.BETTER_AUTH_URL || vercel || `http://localhost:${env.PORT || 3000}`).replace(/\/+$/, "");
+}
+
+/** Every address this deployment answers on, so Better Auth accepts requests from each of them. */
+export function trustedOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
+  const all = [appUrl(env), https(env.VERCEL_PROJECT_PRODUCTION_URL), https(env.VERCEL_BRANCH_URL), https(env.VERCEL_URL)];
+  return [...new Set(all.filter((u): u is string => !!u))];
 }
 
 /** Host (with port) the SIWE message must name. */
@@ -30,6 +46,7 @@ export function createAuth() {
   return betterAuth({
     appName: "ResFunder",
     baseURL: appUrl(),
+    trustedOrigins: trustedOrigins(),
     secret,
     database: getPool(),
     session: { expiresIn: 60 * 60 * 24 * 7 },
