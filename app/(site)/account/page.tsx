@@ -1,6 +1,8 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { AccountPanel } from "@/components/auth/account-panel";
 
-// The app at / (ported from the demo artifact) covers this screen.
+export const metadata: Metadata = { title: "Your account" };
+
 export default function Page() {
-  redirect("/");
+  return <AccountPanel />;
 }

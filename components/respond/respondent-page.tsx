@@ -4,6 +4,7 @@ import { Check, Clock3, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Address } from "viem";
 import type { ResponseResult, SurveyDetails } from "@/lib/api/shapes";
+import { RequireSession } from "@/components/auth/require-session";
 import { inputCls } from "@/components/survey-builder/question-card";
 import { Button } from "@/components/ui/button";
 import { ApiClientError, api } from "@/lib/ui/api-client";
@@ -17,9 +18,17 @@ const POLL_LIMIT_MS = 120_000;
 const errText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
 
 export function RespondentPage({ surveyId }: { surveyId: number }) {
+  return (
+    <RequireSession reason="Sign in with your email and wallet to answer. Payments go to your wallet.">
+      {(user) => <Respondent surveyId={surveyId} defaultEmail={user.email} />}
+    </RequireSession>
+  );
+}
+
+function Respondent({ surveyId, defaultEmail }: { surveyId: number; defaultEmail: string }) {
   const [survey, setSurvey] = useState<SurveyDetails | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(defaultEmail);
   const [draft, setDraft] = useState<Draft>({});
   const [wallet, setWallet] = useState<Address | null>(null);
   const [problems, setProblems] = useState<Record<string, string>>({});

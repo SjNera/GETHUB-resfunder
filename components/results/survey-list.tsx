@@ -4,12 +4,21 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { SurveySummary } from "@/lib/api/shapes";
+import { RequireSession } from "@/components/auth/require-session";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { api } from "@/lib/ui/api-client";
 import { bnbAmount } from "@/lib/ui/format";
 import { connectWallet, signProof } from "@/lib/ui/wallet";
 
 export function SurveyList() {
+  return (
+    <RequireSession reason="Sign in to see your surveys.">
+      {() => <List />}
+    </RequireSession>
+  );
+}
+
+function List() {
   const [surveys, setSurveys] = useState<SurveySummary[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

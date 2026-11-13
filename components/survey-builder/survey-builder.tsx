@@ -2,8 +2,8 @@
 
 import { Check, Plus } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { useAccount } from "@/lib/ui/auth/store";
+import { Button } from "@/components/ui/button";
+import { RequireSession } from "@/components/auth/require-session";
 import {
   initialState,
   MAX_QUESTIONS,
@@ -30,7 +30,14 @@ function loadDraft(): BuilderState | null {
 }
 
 export function SurveyBuilder() {
-  const { ready, account } = useAccount();
+  return (
+    <RequireSession reason="Sign in to build and fund a survey.">
+      {() => <Builder />}
+    </RequireSession>
+  );
+}
+
+function Builder() {
   const [state, dispatch] = useReducer(reduce, undefined, initialState);
   const hydrated = useRef(false);
   const [step, setStep] = useState<"build" | "fund">("build");
@@ -48,16 +55,6 @@ export function SurveyBuilder() {
 
   const v = useMemo(() => validate(state), [state]);
   const errs = v.errors;
-
-  if (ready && !account) {
-    return (
-      <div className="mx-auto max-w-xl px-5 py-20 text-center">
-        <h1 className="display text-3xl">Sign in to publish a survey</h1>
-        <p className="mt-3 text-muted">You need an account and a verified wallet to fund a survey.</p>
-        <ButtonLink href="/sign-in" variant="primary" className="mt-6">Sign in</ButtonLink>
-      </div>
-    );
-  }
 
   const next = () => {
     setTried(true);

@@ -5,6 +5,7 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import { useCallback, useState } from "react";
 import type { Address } from "viem";
 import type { LogResponse, SurveyDetails } from "@/lib/api/shapes";
+import { RequireSession } from "@/components/auth/require-session";
 import { SurveyShell } from "@/components/survey/survey-shell";
 import { Button } from "@/components/ui/button";
 import { ApiClientError, api } from "@/lib/ui/api-client";
@@ -20,6 +21,14 @@ type Data = { log: LogResponse; details: SurveyDetails };
 
 /** Lives in the [id] layout, so signing in once carries across the tabs. */
 export function SurveyWorkspace({ surveyId }: { surveyId: number }) {
+  return (
+    <RequireSession reason="Sign in to see this survey's results.">
+      {() => <Workspace surveyId={surveyId} />}
+    </RequireSession>
+  );
+}
+
+function Workspace({ surveyId }: { surveyId: number }) {
   const segment = useSelectedLayoutSegment();
   const tab = segment && isTabId(segment) ? segment : "overview";
   const [wallet, setWallet] = useState<Address | null>(null);

@@ -115,7 +115,7 @@ const S={authed:false,landing:true,auth:{step:0,email:'',code:'',wallet:false,mo
   decided:{},seq:0,order:REV.map(d=>d.id),reasonFor:null,reason:0,openRev:null,qType:'all',qStatus:'pending',qQ:'',
   range:'week',day:6,lQ:'',lRes:'all',lBy:'all',lSel:new Set(),fOpen:false,rq3:'',fsub:'all',rv:'all',ri:0,jLink:'',
   sv:null};
-try{if(localStorage.getItem('rf-app-authed')==='1'){S.authed=true;S.auth.wallet=true;S.auth.email=localStorage.getItem('rf-app-email')||'juan.delacruz@umak.edu.ph'}}catch(e){}
+try{localStorage.removeItem('rf-app-authed');localStorage.removeItem('rf-app-email')}catch(e){}
 
 const byRev=id=>REV.find(d=>d.id===id);
 const pending=()=>S.order.map(byRev).filter(d=>!S.decided[d.id]);
@@ -679,7 +679,7 @@ function newDraft(){let d=SURVEYS.find(s=>s.status==='draft');
 function act(a,el){if(authAct(a,el))return;const s=SV(S.sid);
   switch(a){
     case 'toLanding':S.landing=true;S.auth.stage='email';render();try{window.scrollTo({top:0})}catch(e){}break;
-    case 'lpStart':S.landing=false;S.auth.stage='email';render();try{window.scrollTo({top:0})}catch(e){}break;
+    case 'lpStart':location.assign(el.dataset.to||'/sign-in');break;
     case 'lpScroll':{const t=document.getElementById(el.dataset.to);if(t)t.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});break;}
     case 'demoAuthEmail':S.auth.email='juan.delacruz@umak.edu.ph';render();break;
     case 'authEmail':if(!emailOk(S.auth.email))return setErr('aEmailErr','Use your @umak.edu.ph school email.');S.auth.step=1;render();toast('Code sent (demo)');break;
@@ -856,11 +856,11 @@ function vLanding(){
   const ev=[['pay','Response #42 · Paid 0.001 tBNB','“Madalas may online class pa ng gabi…”','Taglish · labelled valid twice · BscScan'],['rev','Response #43 · Sent to Review','Instruction-like text flagged','Waits for the researcher, with the AI reason'],['no','Response #44 · Not paid','Required answer was empty','Code-confirmed · logged on-chain']];
   const evIc={pay:I.check,rev:I.clock,no:I.x};
   const orbit=[[I.doc,'Survey','lp-o1'],[I.mail,'School email','lp-o2'],[I.coins,'Escrow','lp-o3'],[I.shield,'Screening','lp-o4'],[I.ai,'AI label','lp-o5'],[I.link,'BscScan','lp-o6']];
-  const start=(cls='')=>`<div class="lp-start ${cls}"><button class="btn lp-primary" data-act="lpStart" data-mode="up">Publish a survey</button><button class="btn lp-outline" data-act="lpStart" data-mode="up">Answer a survey</button></div>`;
+  const start=(cls='')=>`<div class="lp-start ${cls}"><button class="btn lp-primary" data-act="lpStart" data-to="/sign-in?next=%2Fpublish">Publish a survey</button><button class="btn lp-outline" data-act="lpStart" data-to="/sign-in?next=%2Fjoin">Answer a survey</button></div>`;
   return `<div class="lp">
   <header class="lp-nav"><div class="lp-navin"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>
     <nav class="lp-links" aria-label="Site"><button data-act="lpScroll" data-to="lp-how">How it works</button><button data-act="lpScroll" data-to="lp-rules">Screening rules</button></nav>
-    <span class="lp-navr"><button class="btn ghost" data-act="lpStart" data-mode="in">Sign in</button><button class="btn dark" data-act="lpStart" data-mode="up">Get started</button></span></div></header>
+    <span class="lp-navr"><button class="btn ghost" data-act="lpStart" data-to="/sign-in">Sign in</button><button class="btn dark" data-act="lpStart" data-to="/sign-in?next=%2Fpublish">Get started</button></span></div></header>
 
   <section class="lp-hero">
     <div class="lp-orbit" aria-hidden="true"><i></i><i></i><i></i>${orbit.map(([ic,l,c])=>`<span class="lp-chip ${c}" title="${l}">${ic}</span>`).join('')}</div>

@@ -4,7 +4,7 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { useAccount } from "@/lib/ui/auth/store";
+import { useSession } from "@/lib/ui/auth/client";
 import { Logo } from "./logo";
 
 const links = [
@@ -14,8 +14,9 @@ const links = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
-  const { ready, account } = useAccount();
-  const signedIn = ready && !!account;
+  const { data: session } = useSession();
+  const account = session?.user ?? null;
+  const signedIn = !!account;
   return (
     <>
       <header className="sticky top-0 z-40 px-3 pt-3 sm:px-4">

@@ -1,6 +1,13 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { WalletSignIn } from "@/components/auth/wallet-sign-in";
 
-// The app at / (ported from the demo artifact) covers this screen.
+export const metadata: Metadata = { title: "Sign in" };
+
 export default function Page() {
-  redirect("/");
+  return (
+    <Suspense fallback={null}>
+      <WalletSignIn />
+    </Suspense>
+  );
 }

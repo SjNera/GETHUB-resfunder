@@ -11,7 +11,7 @@ export function ResFunderApp() {
   return (
     <>
       <div className="banner">
-        <b>BSC Testnet</b> · test tokens only, no real money · demo mode: sign-in, MetaMask and transactions are simulated
+        <b>BSC Testnet</b> · test tokens only, no real money
       </div>
       <div id="root" />
       <div id="drawerRoot" />
