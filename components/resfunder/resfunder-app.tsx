@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { createBridge } from "./bridge";
 
 /** Mount points for the ResFunder app. The vanilla engine renders into them once on the client. */
 export function ResFunderApp() {
   useEffect(() => {
-    void import("./engine.js").then((m) => m.startResFunder());
+    void import("./engine.js").then((m) => m.startResFunder(createBridge()));
   }, []);
 
   return (

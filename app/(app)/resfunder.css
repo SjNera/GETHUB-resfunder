@@ -967,3 +967,20 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
   .lp-navin,.lp-ev{background:var(--card);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:var(--ink)}
   .lp-steps li{background:#1c1c1c;backdrop-filter:none;border-color:rgba(255,255,255,.6)}
 }
+
+/* ---------- wired dashboard: notes on screens without a server route, scale questions, links ---------- */
+.sample{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;line-height:1.5;color:var(--muted);border:1px dashed var(--line-2);border-radius:14px;padding:10px 14px;margin:0 0 14px}
+.sample svg{width:15px;height:15px;flex:none;margin-top:3px}
+.sample b{color:var(--ink);font-weight:600}
+.srow .pill,.h .pill{margin-left:6px;vertical-align:middle;font-size:12px}
+.fscale{display:flex;gap:8px;flex-wrap:wrap}
+.fscale span{min-width:40px;text-align:center;border:1px solid var(--line-2);border-radius:10px;padding:7px 0;font-size:14px;font-variant-numeric:tabular-nums;color:var(--muted);background:var(--card)}
+.fscale span.on{background:var(--orange);border-color:var(--orange);color:#1b0d00;font-weight:600}
+.gchips.gscale{grid-template-columns:repeat(5,1fr);gap:8px}
+.gchips.gscale label{font-size:15px;padding:12px 2px;font-variant-numeric:tabular-nums}
+.st i.rev{background:var(--yellow-bar)}
+table.t a.mono,.kv a,.lockbar a.mono{color:inherit;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line-2)}
+@media(hover:hover){table.t a.mono:hover,.kv a:hover,.lockbar a.mono:hover{text-decoration-color:currentColor}}
+a.btn{text-decoration:none}
+.pfoot a.btn{display:flex;justify-content:center}
+.btn:disabled,.fundbtn:disabled,.mmbtn:disabled{opacity:.55;cursor:not-allowed}
