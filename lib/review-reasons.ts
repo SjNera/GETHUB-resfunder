@@ -9,6 +9,3 @@ export const REJECT_REASONS = {
 
 export type RejectReasonCode = keyof typeof REJECT_REASONS;
 export const REJECT_REASON_CODES = Object.keys(REJECT_REASONS) as [RejectReasonCode, ...RejectReasonCode[]];
-
-export const APPEAL_MIN_CHARS = 10;
-export const APPEAL_MAX_CHARS = 300;

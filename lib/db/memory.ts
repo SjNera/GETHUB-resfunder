@@ -4,8 +4,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Hex } from '../types';
 import type {
-  AppealRow,
-  AppealStatus,
   DecisionRow,
   HistoryRow,
   LogRecord,
@@ -23,13 +21,11 @@ type StoredResponse = ResponseRow & { emailHash: string };
 let surveys: StoredSurvey[] = [];
 let responses: StoredResponse[] = [];
 let decisions: DecisionRow[] = [];
-let appeals: AppealRow[] = [];
 
 export function reset(): void {
   surveys = [];
   responses = [];
   decisions = [];
-  appeals = [];
   profiles.clear();
 }
 
@@ -119,7 +115,6 @@ export async function listResponsesByWallet(wallet: string, limit = 200): Promis
         surveyTitle: survey.survey.title,
         rateWei: survey.rateWei,
         decision: d ? { result: d.result, reasons: d.reasons, status: d.status, txHash: d.txHash } : null,
-        appeal: appeals.find((a) => a.responseId === r.id)?.status ?? null,
       };
     });
 }
@@ -210,13 +205,13 @@ export async function failDecision(decisionId: string, error: string): Promise<v
 
 export async function reopenDecision(
   decisionId: string,
-  d: { result: DecisionRow['result']; reasons: string[]; reasonHash: Hex; status: 'pending' | 'off_chain' },
+  d: { result: DecisionRow['result']; reasons: string[]; reasonHash: Hex },
 ): Promise<DecisionRow | null> {
   const row = decisions.find((x) => x.id === decisionId);
   if (!row || (row.status !== 'off_chain' && row.status !== 'failed')) return null;
-  Object.assign(row, { result: d.result, reasons: d.reasons, reasonHash: d.reasonHash, status: d.status, txHash: null, error: null });
+  Object.assign(row, { result: d.result, reasons: d.reasons, reasonHash: d.reasonHash, status: 'pending', txHash: null, error: null });
   const r = responses.find((x) => x.id === row.responseId);
-  if (r) r.status = d.status === 'pending' ? 'processing' : 'blocked';
+  if (r) r.status = 'processing';
   return { ...row };
 }
 
@@ -228,30 +223,6 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
 
 export async function getProfile(userId: string): Promise<Record<string, unknown> | null> {
   return profiles.get(userId) ?? null;
-}
-
-export async function insertAppeal(responseId: string, text: string): Promise<AppealRow | null> {
-  if (appeals.some((a) => a.responseId === responseId)) return null;
-  const row: AppealRow = { id: randomUUID(), responseId, text, status: 'open', createdAt: new Date() };
-  appeals.push(row);
-  return { ...row };
-}
-
-export async function getAppeal(responseId: string): Promise<AppealRow | null> {
-  const a = appeals.find((x) => x.responseId === responseId);
-  return a ? { ...a } : null;
-}
-
-export async function settleAppeal(responseId: string, status: Exclude<AppealStatus, 'open'>): Promise<boolean> {
-  const a = appeals.find((x) => x.responseId === responseId && x.status === 'open');
-  if (!a) return false;
-  a.status = status;
-  return true;
-}
-
-export async function listAppealsBySurvey(surveyId: number): Promise<AppealRow[]> {
-  const mine = new Set(responses.filter((r) => r.surveyId === surveyId).map((r) => r.id));
-  return appeals.filter((a) => mine.has(a.responseId)).map((a) => ({ ...a }));
 }
 
 export async function listSentDecisions(surveyId: number): Promise<DecisionRow[]> {

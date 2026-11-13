@@ -1,5 +1,5 @@
 // Browser-side client for the API routes (TDD section 7). Shapes come from lib/api/shapes.ts.
-import type { AppealItem, ClosedResult, HistoryItem, LogResponse, OpenSurvey, RegisterResult, ResponseResult, SubmitResult, SurveyDetails, SurveySummary } from "@/lib/api/shapes";
+import type { ClosedResult, HistoryItem, LogResponse, OpenSurvey, RegisterResult, ResponseResult, SubmitResult, SurveyDetails, SurveySummary } from "@/lib/api/shapes";
 import type { Answers, ApiError, AuthProof, ErrorCode, Hex, SurveyJson, WeiString } from "@/lib/types";
 
 export class ApiClientError extends Error {
@@ -50,9 +50,6 @@ export const api = {
   list: (proof: AuthProof) => call<{ surveys: SurveySummary[] }>("/api/surveys", { headers: authHeaders(proof) }),
   decide: (responseId: string, decision: "pay" | "dont_pay", reason?: string) =>
     call<ResponseResult>(`/api/responses/${encodeURIComponent(responseId)}/decide`, { method: "POST", body: { decision, reason } }),
-  appeal: (responseId: string, text: string) =>
-    call<{ responseId: string }>(`/api/responses/${encodeURIComponent(responseId)}/appeal`, { method: "POST", body: { text } }),
-  appeals: (id: number, proof: AuthProof) => call<{ appeals: AppealItem[] }>(`/api/surveys/${id}/appeals`, { headers: authHeaders(proof) }),
   saveProfile: (profile: Record<string, unknown>) =>
     call<{ saved: true }>("/api/me/profile", { method: "PUT", body: { profile } }),
   open: () => call<{ surveys: OpenSurvey[] }>("/api/surveys/open"),

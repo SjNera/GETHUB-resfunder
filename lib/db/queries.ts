@@ -248,17 +248,15 @@ export interface HistoryRow {
   surveyTitle: string;
   rateWei: bigint;
   decision: Pick<DecisionRow, 'result' | 'reasons' | 'status' | 'txHash'> | null;
-  appeal: AppealStatus | null;
 }
 
 export async function listResponsesByWallet(wallet: string, limit = 200): Promise<HistoryRow[]> {
   const rows = await query<Raw>(
     `SELECT r.*, s.questions_json AS survey_json, s.rate_wei, d.id AS decision_id, d.result, d.reasons,
-            d.status AS decision_status, d.tx_hash, a.status AS appeal_status
+            d.status AS decision_status, d.tx_hash
      FROM responses r
      JOIN surveys s ON s.survey_id = r.survey_id
      LEFT JOIN decisions d ON d.response_id = r.id
-     LEFT JOIN appeals a ON a.response_id = r.id
      WHERE r.wallet = $1
      ORDER BY r.submitted_at DESC, r.id
      LIMIT $2::int`,
@@ -277,7 +275,6 @@ export async function listResponsesByWallet(wallet: string, limit = 200): Promis
             status: r.decision_status as DecisionStatus,
             txHash: toHexOrNull(r.tx_hash),
           },
-    appeal: r.appeal_status == null ? null : (r.appeal_status as AppealStatus),
   }));
 }
 
@@ -400,27 +397,26 @@ export async function failDecision(decisionId: string, error: string): Promise<v
 
 /**
  * A person decides a response the rules left open (or one whose transaction failed): saves the new
- * result and reasons on the same decision row and moves the response in one statement.
- * 'pending' is followed by a transaction; 'off_chain' (a rejection the respondent may appeal) is not.
- * Returns null when the decision is not open any more, so two calls cannot both win.
+ * result and reasons on the same decision row as 'pending' and moves the response to 'processing',
+ * in one statement. A transaction follows. Returns null when the decision is not open any more,
+ * so two calls cannot both win.
  */
 export async function reopenDecision(
   decisionId: string,
-  d: { result: DecisionResult; reasons: string[]; reasonHash: Hex; status: 'pending' | 'off_chain' },
+  d: { result: DecisionResult; reasons: string[]; reasonHash: Hex },
 ): Promise<DecisionRow | null> {
-  const responseStatus = d.status === 'pending' ? 'processing' : 'blocked';
   const rows = await query<Raw>(
     `WITH d AS (
        UPDATE decisions
-       SET result = $2, reasons = $3::jsonb, reason_hash = $4, status = $5, tx_hash = NULL, error = NULL
+       SET result = $2, reasons = $3::jsonb, reason_hash = $4, status = 'pending', tx_hash = NULL, error = NULL
        WHERE id = $1::uuid AND status IN ('off_chain','failed')
        RETURNING *
      ), r AS (
-       UPDATE responses SET status = $6 WHERE id IN (SELECT response_id FROM d)
+       UPDATE responses SET status = 'processing' WHERE id IN (SELECT response_id FROM d)
        RETURNING id
      )
      SELECT * FROM d`,
-    [decisionId, d.result, JSON.stringify(d.reasons), d.reasonHash, d.status, responseStatus],
+    [decisionId, d.result, JSON.stringify(d.reasons), d.reasonHash],
   );
   return rows[0] ? mapDecision(rows[0]) : null;
 }
@@ -450,62 +446,6 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
 export async function getProfile(userId: string): Promise<Record<string, unknown> | null> {
   const rows = await query<Raw>('SELECT data FROM profiles WHERE user_id = $1', [userId]);
   return rows[0] ? (rows[0].data as Record<string, unknown>) : null;
-}
-
-// ---------- Appeals ----------
-
-export type AppealStatus = 'open' | 'paid' | 'kept';
-
-export interface AppealRow {
-  id: string;
-  responseId: string;
-  text: string;
-  status: AppealStatus;
-  createdAt: Date;
-}
-
-function mapAppeal(r: Raw): AppealRow {
-  return {
-    id: String(r.id),
-    responseId: String(r.response_id),
-    text: String(r.text),
-    status: r.status as AppealStatus,
-    createdAt: toDate(r.created_at),
-  };
-}
-
-/** Returns null when the response already has an appeal. */
-export async function insertAppeal(responseId: string, text: string): Promise<AppealRow | null> {
-  const rows = await query<Raw>(
-    `INSERT INTO appeals (response_id, text) VALUES ($1::uuid, $2)
-     ON CONFLICT (response_id) DO NOTHING RETURNING *`,
-    [responseId, text],
-  );
-  return rows[0] ? mapAppeal(rows[0]) : null;
-}
-
-export async function getAppeal(responseId: string): Promise<AppealRow | null> {
-  const rows = await query<Raw>('SELECT * FROM appeals WHERE response_id = $1::uuid', [responseId]);
-  return rows[0] ? mapAppeal(rows[0]) : null;
-}
-
-/** open -> paid or kept. Returns false when the appeal was not open. */
-export async function settleAppeal(responseId: string, status: 'paid' | 'kept'): Promise<boolean> {
-  const rows = await query<Raw>(
-    `UPDATE appeals SET status = $2, decided_at = now()
-     WHERE response_id = $1::uuid AND status = 'open' RETURNING id`,
-    [responseId, status],
-  );
-  return rows.length > 0;
-}
-
-export async function listAppealsBySurvey(surveyId: number): Promise<AppealRow[]> {
-  const rows = await query<Raw>(
-    `SELECT a.* FROM appeals a JOIN responses r ON r.id = a.response_id
-     WHERE r.survey_id = $1::bigint ORDER BY a.created_at DESC`,
-    [String(surveyId)],
-  );
-  return rows.map(mapAppeal);
 }
 
 // ---------- Decision log ----------

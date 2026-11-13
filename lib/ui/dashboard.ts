@@ -178,8 +178,6 @@ export function openView(o: OpenSurvey, now: number): EngineOpen {
 // ---------- my responses (as a respondent) ----------
 
 export type EngineHistory = {
-  canAppeal: boolean;
-  appeal: "open" | "paid" | "kept" | null;
   key: string;
   sid: string;
   title: string;
@@ -203,8 +201,6 @@ export function historyView(items: readonly HistoryItem[], now: number): { rows:
       paid += 1;
     }
     return {
-      canAppeal: h.canAppeal,
-      appeal: h.appeal,
       key: h.responseId,
       sid: String(h.surveyId),
       title: h.surveyTitle,

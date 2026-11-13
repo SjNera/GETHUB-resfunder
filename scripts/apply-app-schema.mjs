@@ -1,4 +1,4 @@
-// Applies lib/db/app-schema.sql (appeals, profiles) to DATABASE_URL. Run after db:apply and db:apply:auth: npm run db:apply:app
+// Applies lib/db/app-schema.sql (profiles) to DATABASE_URL. Run after db:apply and db:apply:auth: npm run db:apply:app
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 
