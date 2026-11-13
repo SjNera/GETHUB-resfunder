@@ -43,6 +43,19 @@ describe('runLab', () => {
     for (const v of ev.filter((e) => e.type === 'verdict')) expect(v.type === 'verdict' && v.match).toBe(true);
   });
 
+  it('records both Groq runs for a case that reaches the AI', async () => {
+    vi.stubEnv('GROQ_MODEL', 'fake-model');
+    const reply = (label: string) => ({ choices: [{ message: { content: JSON.stringify({ label, type: null, injection: false, reason: 'ok' }) } }] });
+    const create = vi.fn().mockResolvedValueOnce(reply('valid')).mockResolvedValueOnce(reply('unclear'));
+    const events: LabEvent[] = [];
+    await runLab(['g01'], (e) => events.push(e), { pauseMs: 0, client: { chat: { completions: { create } } } });
+    const ai = events.find((e) => e.type === 'ai');
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(ai?.type === 'ai' && ai.runs.map((r) => r.parsed?.label)).toEqual(['valid', 'unclear']);
+    expect(ai?.type === 'ai' && ai.ai?.agreed).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
   it('a stop signal ends the run early', async () => {
     const ctl = new AbortController();
     const events: LabEvent[] = [];

@@ -1,7 +1,7 @@
 'use client';
 // TEMPORARY validation lab. Delete with app/lab and lib/lab.
 import { useRef, useState } from 'react';
-import type { LabEvent } from '@/lib/lab/events';
+import type { LabEvent, LabRun } from '@/lib/lab/events';
 import type { AiResult, DecisionResult, Signals } from '@/lib/types';
 
 type Meta = { id: string; group: string; note: string; expected: DecisionResult };
@@ -10,7 +10,7 @@ type Row = {
   question?: string;
   answer?: string;
   signals?: Signals;
-  ai?: { skipped: boolean; ai: AiResult | null; model: string | null; ms: number };
+  ai?: { skipped: boolean; ai: AiResult | null; model: string | null; ms: number; runs: LabRun[] };
   verdict?: { result: DecisionResult; reasons: string[]; match: boolean };
 };
 
@@ -43,6 +43,9 @@ const css = `
 .chk{display:flex;gap:8px;flex-wrap:wrap;margin:3px 0}.verdict{border-radius:10px;padding:10px 12px}
 .verdict.ok{background:var(--okb)}.verdict.warn{background:var(--warnb)}.verdict.bad{background:var(--badb)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13px}.kv dt{color:var(--mut)}.kv dd{margin:0;overflow-wrap:anywhere}
+.runs{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:560px){.runs{grid-template-columns:1fr}}
+.run{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}.run>b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+.run pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11.5px;background:var(--skip);padding:6px 8px;border-radius:6px;margin:4px 0 0}.bad-t{color:var(--bad)}
 .spin{display:inline-block;animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spin{animation:none}}
 `;
 
@@ -67,7 +70,7 @@ export function LabClient({ cases, hasAi, model }: { cases: Meta[]; hasAi: boole
         setRunning(e.id);
         setSel(e.id);
       } else if (e.type === 'checks') r.signals = e.signals;
-      else if (e.type === 'ai') r.ai = { skipped: e.skipped, ai: e.ai, model: e.model, ms: e.ms };
+      else if (e.type === 'ai') r.ai = { skipped: e.skipped, ai: e.ai, model: e.model, ms: e.ms, runs: e.runs };
       else if (e.type === 'verdict') r.verdict = { result: e.result, reasons: e.reasons, match: e.match };
       return { ...prev, [e.id]: r };
     });
@@ -179,6 +182,29 @@ export function LabClient({ cases, hasAi, model }: { cases: Meta[]; hasAi: boole
                     : !cur.ai ? (cur.signals.hardFails.length ? <p className="mut">Skipped: a hard fail decides this.</p> : <p className="mut"><span className="spin">◐</span> Waiting for Groq…</p>)
                     : cur.ai.skipped ? <p className="mut">Not called (hard fail, or no open answer).</p>
                     : cur.ai.ai ? (
+                      <>
+                      <div className="runs">
+                        {[0, 1].map((i) => {
+                          const run = cur.ai!.runs[i];
+                          return (
+                            <div className="run" key={i}>
+                              <b>Run {i + 1}{run ? ` · ${run.ms} ms` : ''}</b>
+                              {!run ? <span className="mut">No call made</span>
+                                : run.error ? <span className="bad-t">Failed: {run.error}</span>
+                                : !run.parsed ? <span className="bad-t">Reply was not usable JSON</span>
+                                : (
+                                  <dl className="kv">
+                                    <dt>Label</dt><dd>{run.parsed.label ?? '?'}{run.parsed.type ? ` · ${run.parsed.type}` : ''}</dd>
+                                    <dt>Injection</dt><dd>{run.parsed.injection === undefined ? '?' : run.parsed.injection ? <b>Flagged</b> : 'No'}</dd>
+                                    <dt>Reason</dt><dd>{run.parsed.reason ?? '?'}</dd>
+                                  </dl>
+                                )}
+                              {run?.raw && <details><summary className="mut">Raw reply</summary><pre>{run.raw}</pre></details>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="mut" style={{ margin: '8px 0 4px' }}>Combined result</p>
                       <dl className="kv">
                         <dt>Label</dt><dd>{cur.ai.ai.label}{cur.ai.ai.type ? ` · ${cur.ai.ai.type}` : ''}</dd>
                         <dt>Runs agreed</dt><dd>{cur.ai.ai.agreed ? 'Yes' : <b>No (sent to Review)</b>}</dd>
@@ -186,6 +212,7 @@ export function LabClient({ cases, hasAi, model }: { cases: Meta[]; hasAi: boole
                         <dt>Reason</dt><dd>{cur.ai.ai.reason}</dd>
                         <dt>Time</dt><dd>{cur.ai.ms} ms · {cur.ai.model ?? 'no model'}</dd>
                       </dl>
+                      </>
                     ) : <p className="mut">No AI result.</p>}
                 </div>
 
