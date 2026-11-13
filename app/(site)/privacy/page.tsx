@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Privacy notice" };
 
 const rows = [
-  ["School email", "Sign-in, contact, and the one-response-per-survey check (as a keyed hash)", "Off-chain"],
+  ["Email", "Sign-in, contact, and the one-response-per-survey check (as a keyed hash)", "Off-chain"],
   ["Demographics (age range, sex, school, college, program, year level, region, city, working status)", "Matching you to surveys; shown to researchers only alongside your answers", "Off-chain"],
   ["Wallet address", "Receiving payments and funding surveys", "On-chain with each payment or block"],
   ["Survey answers", "Screening (sent to a third-party AI model, Groq) and the researcher's results", "Off-chain"],

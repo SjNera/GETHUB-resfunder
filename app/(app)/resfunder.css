@@ -46,9 +46,8 @@ a{color:inherit}
 .shell{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:calc(100vh - 34px)}
 .side{position:sticky;top:0;align-self:start;height:calc(100vh - 34px);background:var(--card);border-right:1px solid var(--line);padding:18px 14px 14px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding-left:max(14px,env(safe-area-inset-left,0px))}
 .brand{display:flex;align-items:center;gap:10px;font:700 21px/1 var(--f-head);letter-spacing:-.02em;padding:4px 6px}
-.logo{position:relative;width:32px;height:20px;flex:none}
-.logo::before,.logo::after{content:"";position:absolute;top:0;width:20px;height:20px;border-radius:50%}
-.logo::before{left:0;background:var(--black)} .logo::after{left:12px;background:var(--orange);mix-blend-mode:multiply}
+/* Brand mark, same paths as public/brand/resfunder-mark.svg */
+.logo{width:26px;height:26px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='%23121212' d='M23.8 9.7 L32 5 L40.2 9.7 M55.4 36.1 L55.4 45.5 L47.2 50.3 M40.2 54.3 L32 59 L23.8 54.3 M16.8 50.3 L8.6 45.5 L8.6 36.1 M8.6 27.9 L8.6 18.5 L16.8 13.8'/%3E%3Cpath stroke='%23ff8a1c' d='M15 41 L24 32 L31 38 L55.4 18.5 M47.2 13.8 L55.4 18.5 L55.4 27.9'/%3E%3C/svg%3E") center/contain no-repeat}
 .brand .sp{flex:1}
 .ibtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line-2);background:var(--card);display:inline-grid;place-items:center;padding:0;flex:none}
 .ibtn svg{width:17px;height:17px}
@@ -60,7 +59,7 @@ a{color:inherit}
 .nav{display:grid;gap:2px}
 .nv{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;text-align:left;padding:9px 10px;border-radius:12px;color:var(--muted);font-size:15px}
 .nv svg{width:19px;height:19px;flex:none}
-.nv:hover{background:var(--well);color:var(--ink)}
+@media (hover:hover) and (pointer:fine){.nv:hover{background:var(--well);color:var(--ink)}}
 .nv.on{color:var(--ink);font-weight:600}
 .nv.top.on{background:var(--well)}
 .nv .cnt{margin-left:auto}
@@ -82,7 +81,7 @@ a{color:inherit}
 .scrimSide{display:none}
 @media(max-width:980px){
   .shell{grid-template-columns:1fr}
-  .side{position:fixed;top:0;left:0;bottom:0;height:auto;width:min(300px,86vw);z-index:25;transform:translateX(-105%);transition:transform .2s;padding-top:max(18px,env(safe-area-inset-top,0px))}
+  .side{position:fixed;top:0;left:0;bottom:0;height:auto;width:min(300px,86vw);z-index:25;transform:translateX(-105%);transition:transform 260ms var(--ease-drawer);padding-top:max(18px,env(safe-area-inset-top,0px))}
   .side.open{transform:none;box-shadow:20px 0 60px rgba(0,0,0,.2)}
   .scrimSide.open{display:block;position:fixed;inset:0;background:var(--scrim);z-index:24}
   .menuBtn{display:inline-grid}
@@ -94,19 +93,19 @@ a{color:inherit}
 .ph .l{display:flex;align-items:center;gap:12px;min-width:0}
 .crumb{font-size:13.5px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .crumb button{border:0;background:none;padding:0;color:var(--muted)}
-.crumb button:hover{color:var(--ink);text-decoration:underline}
+@media (hover:hover) and (pointer:fine){.crumb button:hover{color:var(--ink);text-decoration:underline}}
 .ph h1{font:700 clamp(24px,2.6vw,30px)/1.15 var(--f-head);letter-spacing:-.02em;margin:2px 0 0;text-wrap:balance}
 .ph .acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .btn{border:1px solid var(--line-2);background:var(--card);border-radius:12px;padding:10px 18px;font-size:15px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;text-decoration:none;color:var(--ink)}
 .btn svg{width:16px;height:16px}
-.btn:hover{border-color:var(--ink)}
+@media (hover:hover) and (pointer:fine){.btn:hover{border-color:var(--ink)}}
 .btn.dark{background:var(--black);color:var(--on-black);border-color:var(--black)}
 .btn.red{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,var(--line-2))}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
-.btn.ghost:hover{color:var(--ink)}
+@media (hover:hover) and (pointer:fine){.btn.ghost:hover{color:var(--ink)}}
 .btn.block{width:100%;padding:13px 20px;font-size:16px}
 .btn.fund{display:inline-flex;grid-template-columns:none;background:var(--orange);color:#1b0d00;border-color:var(--orange);border-radius:999px;padding:11px 22px;font-weight:600;box-shadow:0 6px 18px color-mix(in srgb,var(--orange) 35%,transparent)}
-.btn.fund:hover{filter:brightness(1.05);border-color:var(--orange)}
+@media (hover:hover) and (pointer:fine){.btn.fund:hover{filter:brightness(1.05);border-color:var(--orange)}}
 .btn.pill{border-radius:999px}
 .tabsrow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
 .tabs{display:inline-flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:5px;max-width:100%;overflow-x:auto}
@@ -183,7 +182,7 @@ table.t input[type=checkbox]{width:17px;height:17px;accent-color:var(--black);cu
 .tools .sbox{flex:1 1 240px;height:42px;max-width:360px}
 .tbtn{height:42px;border-radius:12px;border:1px solid var(--line-2);background:var(--card);padding:0 14px;display:inline-flex;gap:8px;align-items:center;font-size:14.5px}
 .tbtn svg{width:16px;height:16px}
-.tbtn:hover,.tbtn[aria-expanded="true"]{border-color:var(--ink)}
+.tbtn[aria-expanded="true"]{border-color:var(--ink)}@media (hover:hover) and (pointer:fine){.tbtn:hover{border-color:var(--ink)}}
 .tfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;font-size:13.5px;color:var(--muted)}
 .pager{display:flex;gap:6px}
 .pager button{min-width:36px;height:36px;border-radius:10px;border:1px solid var(--line-2);background:var(--card);font-size:14px}
@@ -225,7 +224,7 @@ table.t input[type=checkbox]{width:17px;height:17px;accent-color:var(--black);cu
 @media(max-width:1200px){.home{grid-template-columns:1fr}}
 .needs{padding:20px 22px}
 .needs .it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line);font-size:14px;width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left}
-.needs .it:hover b{text-decoration:underline}
+@media (hover:hover) and (pointer:fine){.needs .it:hover b{text-decoration:underline}}
 .needs .it b{font-weight:500;display:block}
 .needs .it small{color:var(--muted)}
 
@@ -254,7 +253,7 @@ table.t input[type=checkbox]{width:17px;height:17px;accent-color:var(--black);cu
 .cols,.xl{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
 .cols{position:absolute;inset:0;align-items:end}
 .col{height:100%;border:0;background:none;padding:0 0 2px;display:flex;flex-direction:column-reverse;align-items:center;gap:calc(var(--u)*.2);position:relative;border-radius:10px}
-.col:hover,.col.on{background:color-mix(in srgb,var(--well) 70%,transparent)}
+.col.on{background:color-mix(in srgb,var(--well) 70%,transparent)}@media (hover:hover) and (pointer:fine){.col:hover{background:color-mix(in srgb,var(--well) 70%,transparent)}}
 .col.off{cursor:default;background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--well) 80%,transparent) 5px 7px)}
 .dot{width:calc(var(--u)*.8);height:calc(var(--u)*.8);border-radius:50%;flex:none}
 .dot.p{background:var(--green-bar)} .dot.r{background:var(--yellow-bar)} .dot.n{background:var(--red-bar)} .dot.f{box-shadow:inset 0 0 0 1.5px var(--line-2)}
@@ -414,7 +413,7 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
 .fundbtn{margin-top:22px;width:100%;border:0;border-radius:999px;background:var(--orange);color:#1b0d00;padding:18px 24px;font:700 18px/1 var(--f-head);display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 10px 26px color-mix(in srgb,var(--orange) 40%,transparent)}
 .fundbtn .fx{width:30px;height:30px;border-radius:50%;background:#1b0d00;color:var(--orange);display:grid;place-items:center}
 .fundbtn .fx svg{width:16px;height:16px}
-.fundbtn:hover{filter:brightness(1.05)}
+@media (hover:hover) and (pointer:fine){.fundbtn:hover{filter:brightness(1.05)}}
 .fundnote{text-align:center;font-size:13px;color:var(--muted);margin-top:12px}
 .lockbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--green-soft);color:var(--green);border-radius:18px;padding:16px 20px}
 .lockbar svg{width:22px;height:22px;flex:none}
@@ -531,7 +530,7 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
 .mmbtn{width:100%;border:1.5px solid var(--orange);background:var(--orange-soft);color:var(--ink);border-radius:999px;padding:16px 20px;font:600 16px/1 var(--f-body);display:flex;align-items:center;justify-content:center;gap:12px}
 .mmbtn .fx{width:30px;height:30px;border-radius:50%;background:var(--orange);color:#1b0d00;display:grid;place-items:center}
 .mmbtn .fx svg{width:16px;height:16px}
-.mmbtn:hover{background:var(--orange);color:#1b0d00}
+@media (hover:hover) and (pointer:fine){.mmbtn:hover{background:var(--orange);color:#1b0d00}}
 .why{list-style:none;margin:0 0 20px;padding:0;display:grid;gap:8px;font-size:14px;color:var(--muted)}
 .why li{display:flex;gap:10px}
 .why svg{width:16px;height:16px;color:var(--green);flex:none;margin-top:3px}
@@ -701,7 +700,8 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
   .mm .ft{grid-template-columns:1fr}
   .btn{padding:10px 14px}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* Reduced motion: nothing slides or scales. Fades and colour changes stay, each part keeps its own fade fallback, and the screening spinner still turns to show progress. */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-property:opacity,color,background-color,border-color,box-shadow!important}}
 
 /* ===== merged: press feedback (Emil: 0.97, not when disabled) ===== */
 .btn,.ibtn,.mmbtn,.pf-pill span,.pf-role{transition:transform 120ms var(--ease-out),background-color 150ms ease,border-color 150ms ease,color 150ms ease}
@@ -944,3 +944,21 @@ table.fg i{display:inline-block;width:15px;height:15px;border:1.5px solid var(--
 
 .cr-bars .hbar{grid-template-columns:minmax(0,150px) minmax(0,1fr) auto}
 .cr-bars .hbar .n{white-space:nowrap;min-width:84px;text-align:right}
+
+/* ---------- touch, transparency and contrast ---------- */
+/* Touch: small icon buttons keep their look but get a 44px tap area */
+@media (pointer:coarse){
+  .ibtn,.dots,.pager button{position:relative}
+  .ibtn::after,.dots::after,.pager button::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+  .pager{gap:8px}
+}
+/* Reduced transparency: glass becomes solid */
+@media (prefers-reduced-transparency:reduce){
+  .lp-navin,.lp-ev{background:var(--card);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .lp-steps li{background:#1c1c1c;backdrop-filter:none}
+}
+/* More contrast: solid glass with a clear edge */
+@media (prefers-contrast:more){
+  .lp-navin,.lp-ev{background:var(--card);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:var(--ink)}
+  .lp-steps li{background:#1c1c1c;backdrop-filter:none;border-color:rgba(255,255,255,.6)}
+}

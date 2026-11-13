@@ -103,7 +103,7 @@ const ANY=id=>SV(id)||OTHER.find(s=>s.id===id);
 /* Payouts you received as a respondent */
 const MYPAY=[{title:'Library use of first-year students',group:'Thesis Group 2 · BS Education',amt:10,st:'paid',tx:'0x4c1e…9a02',when:'Nov 9'},
   {title:'Awareness of mental health apps',group:'Thesis Group 9 · BS Psychology',amt:12,st:'paid',tx:'0x8f02…11dd',when:'Nov 4'}];
-const me=()=>{const email=S.auth.email||'juan.delacruz@umak.edu.ph',name=email.split('@')[0].split(/[._-]+/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
+const me=()=>{const email=S.auth.email||'juan.delacruz@email.com',name=email.split('@')[0].split(/[._-]+/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
   return {email,name,first:name.split(' ')[0],ini:name.split(' ').map(w=>w[0]).join('').slice(0,2)}};
 const RES={q1:[5,11,14,10,4],q2:[[2,5,12,25],[4,9,15,16],[10,12,12,10],[3,8,14,19],[6,10,17,11],[1,4,13,26]],
   q3:['Assignments tsaka group chat','Mobile games, mostly ML','Netflix series','Overthinking about exams','Readings for the next day','TikTok, hindi ko namamalayan','Group projects online','Part-time work shift'],
@@ -219,7 +219,7 @@ function authShell(inner,{back,step}={}){const A=S.auth,key=(A.stage||'email')+(
 function vAuth(){
   const A=S.auth,P=pf(),stage=A.stage||'email';setTimeout(morphAuth,0);
   if(stage==='email')return authShell(`<h1>Continue with your email</h1>
-    <div class="fld"><label for="aEmail">Email</label><input class="inp" id="aEmail" data-in="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@example.com" value="${esc(A.email)}"><div class="err" id="aEmailErr" role="status"></div></div>
+    <div class="fld"><label for="aEmail">Email</label><input class="inp" id="aEmail" data-in="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="example@email.com" value="${esc(A.email)}"><div class="err" id="aEmailErr" role="status"></div></div>
     <button class="btn dark block au-cta" data-act="authEmail">Continue</button>`);
   if(stage==='blocked')return authShell(`<h1>ResFunder is for people 18 and older for now</h1><button class="btn block au-cta" data-act="toLanding">Back to the home page</button>`);
   if(stage==='who')return authShell(`<h1>Who are you?</h1>
@@ -248,7 +248,7 @@ function vAuth(){
 function go2(stage,idx,dir){const A=S.auth;A._dir=dir||'in';A.stage=stage;if(idx!=null)A.idx=idx;render();try{window.scrollTo({top:0})}catch(e){}}
 function authAct(a,el){const A=S.auth;
   switch(a){
-    case 'authEmail':{const e=(A.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)){setErr('aEmailErr','Enter your email, like name@example.com.');return true}
+    case 'authEmail':{const e=(A.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)){setErr('aEmailErr','Enter your email, like example@email.com.');return true}
       A.email=e;const ex=accounts()[e];
       if(ex&&ex.done){A.pf=ex.pf;A.wallet=ex.wallet;go2('done');return true}
       if(ex){A.pf=ex.pf;A.wallet=ex.wallet||false;go2(ex.stage||'who',ex.idx||0);return true}
@@ -502,7 +502,7 @@ function qrCells(){let h='';const fin=(r,c)=>{const inF=(a,b)=>r>=a&&r<a+7&&c>=b
 function vLiveShare(s){const b=s.rate*s.quota,f=Math.round(b*.05);
   return `<div class="lockbar">${I.lock}<span><b>Budget locked · ${peso(b+f)} in the contract</b><br><span style="font-size:13.5px">${peso(b)} for answers and ${peso(f)} fee. Your survey is live.</span></span><span class="mono">Tx 0x7a3f0c…e2c91e</span></div>
   <div class="lockrow"><div>${I.lock}Rate<b>${peso(s.rate)} per answer</b></div><div>${I.lock}Quota<b>${s.quota} responses</b></div><div>${I.lock}Deadline<b>${fmtDate(s.deadline)}</b></div><div>${I.lock}Questions<b>${s.q.length} locked</b></div></div>
-  <div class="share"><section class="card pad"><h2 class="h">Share the link</h2><p class="muted" style="margin:0">Students open it on their phone and verify a school email before answering.</p>
+  <div class="share"><section class="card pad"><h2 class="h">Share the link</h2><p class="muted" style="margin:0">Students open it on their phone and verify their email before answering.</p>
       <div class="linkbox"><input class="inp" id="shareLink" readonly value="resfunder.app/s/${s.id}" aria-label="Share link"><button class="btn dark" data-act="copyLink">${I.link}Copy</button></div>
       <div class="row" style="margin-top:20px"><button class="btn" data-act="studentView">${I.eye}Student view</button><button class="btn dark pill" data-act="toOverview">Go to overview ${I.arrow}</button></div></section>
     <section class="card pad" style="text-align:center"><h2 class="h">QR code for printing</h2><div class="qr" aria-label="Sample QR code">${qrCells()}</div><p class="hint" style="margin:0 0 12px">Sample pattern in this demo.</p><button class="btn" data-act="toast" data-msg="Downloads a printable QR poster in the real app">${I.dl}Download poster</button></section></div>`}
@@ -559,7 +559,7 @@ function openByLink(t,src){setErr('jErr','');
   const s=findByLink(t);
   if(!s)return setErr('jErr',src==='qr'?"That QR code isn't a ResFunder survey link.":"That isn't a ResFunder survey link. Links look like resfunder.app/s/…");
   if(SV(s.id))return setErr('jErr',"That's one of your own surveys. You can't answer your own surveys.");
-  if(S.answered[s.id])return setErr('jErr','You already answered this survey. One payout per student.');
+  if(S.answered[s.id])return setErr('jErr','You already answered this survey. One payout per respondent.');
   S.jLink='';S.sv=newSV(s.id,true);render()}
 let jsqrP=null;
 const loadJsQR=()=>jsqrP||(jsqrP=new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';sc.onload=()=>window.jsQR?ok(window.jsQR):no();sc.onerror=()=>{jsqrP=null;no()};document.head.appendChild(sc)}));
@@ -610,7 +610,7 @@ function sResults(s){const Q=s.q,n=s.id==='sleep'?IND.length:s.status==='closed'
     <section class="card pad"><div class="between"><h3 class="h">4. ${esc(Q[3].t)}</h3><span class="hint">${RES.q4.length} of 44 answered (optional)</span></div><div class="alist">${RES.q4.map(a=>`<div>${esc(a)}</div>`).join('')}</div></section></div>`}
 function vSettings(){const M=me();
   return header('','Settings','')+`<div class="g2"><section class="card pad"><h2 class="h">Account</h2><p class="muted" style="margin:0 0 16px">You can publish surveys as a researcher and answer other groups' surveys as a respondent.</p>
-      <dl class="kv"><dt>Name</dt><dd>${esc(M.name)}</dd><dt>School email</dt><dd>${esc(M.email)}</dd><dt>Wallet</dt><dd class="mono">${shortW(MY_WALLET)}</dd><dt>Network</dt><dd>BSC Testnet</dd></dl>
+      <dl class="kv"><dt>Name</dt><dd>${esc(M.name)}</dd><dt>Email</dt><dd>${esc(M.email)}</dd><dt>Wallet</dt><dd class="mono">${shortW(MY_WALLET)}</dd><dt>Network</dt><dd>BSC Testnet</dd></dl>
       <div class="srow" style="margin-top:16px;border-top:1px solid var(--line)"><span><b>Sign out</b><small>${esc(M.email)}</small></span><button class="btn" data-act="signOut">Sign out</button></div></section>
     <section class="card pad"><h2 class="h">Notifications</h2>
       <div class="srow"><span><b>New response to review</b><small>Email me when the checks send a response to the review queue.</small></span><label class="switch"><input type="checkbox" checked aria-label="New response to review"><span></span></label></div>
@@ -626,11 +626,11 @@ function phone(body,foot,back){return `<div class="phone"><div class="sbar3"><sp
   <div class="pnav"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>${back?`<button class="btn ghost back" data-rgo="${back}">${I.back}Back</button>`:''}</div><div class="pbody">${body}</div>${foot?`<div class="pfoot">${foot}</div>`:''}</div>`}
 function vStudent(){const R=S.sv,s=ANY(R.sid),Q=s.q;let ph='';
   const step=R.step;
-  if(step==='intro')ph=phone(`<div class="intro"><div class="g">${esc(s.group||'Thesis Group 7 · BS Psychology')} · University of Makati</div><h2>${esc(s.title)}</h2><p>${esc(s.desc)}</p><div class="s3"><div><b>${peso(s.rate)}</b><span>per valid answer</span></div><div><b>${s.mins||4}m</b><span>to complete</span></div><div><b>${s.quota-(s.id==='sleep'?47:s.resp)}</b><span>paid spots left</span></div></div><div class="cl">Closes ${fmtDate(s.deadline)}</div></div>`,`<button class="btn dark block" data-rgo="${R.real?'consent':'verify'}">Start survey</button><span class="hint" style="text-align:center">${R.real?'Signed in as '+esc(me().email)+'.':'You\'ll confirm your school email first.'}</span>`);
+  if(step==='intro')ph=phone(`<div class="intro"><div class="g">${esc(s.group||'Thesis Group 7 · BS Psychology')} · University of Makati</div><h2>${esc(s.title)}</h2><p>${esc(s.desc)}</p><div class="s3"><div><b>${peso(s.rate)}</b><span>per valid answer</span></div><div><b>${s.mins||4}m</b><span>to complete</span></div><div><b>${s.quota-(s.id==='sleep'?47:s.resp)}</b><span>paid spots left</span></div></div><div class="cl">Closes ${fmtDate(s.deadline)}</div></div>`,`<button class="btn dark block" data-rgo="${R.real?'consent':'verify'}">Start survey</button><span class="hint" style="text-align:center">${R.real?'Signed in as '+esc(me().email)+'.':'You\'ll confirm your email first.'}</span>`);
   else if(step==='verify'){
     if(R.verified)ph=phone(`<div class="res"><div class="icirc ic-ok">${I.check}</div><h2 class="ph1">Email verified</h2><p class="pp">${esc(R.email)} can be paid once for this survey.</p></div>`,`<button class="btn dark block" data-rgo="consent">Continue</button>`,'intro');
     else if(R.codeSent)ph=phone(`<h2 class="ph1">Enter the code</h2><p class="pp">We sent a 6-digit code to ${esc(R.email)}.</p><div class="fld"><label for="rCode">Code</label><input class="inp code" id="rCode" data-rin="code" inputmode="numeric" maxlength="6" value="${esc(R.code)}"><div class="err" id="rCodeErr"></div></div><p class="hint">Demo code: 482913 <button class="btn ghost" style="padding:2px 6px;font-size:13px" data-ract="fillCode">Fill it in</button></p>`,`<button class="btn dark block" data-ract="checkCode">Verify</button>`,'intro');
-    else ph=phone(`<h2 class="ph1">Your school email</h2><p class="pp">One payout per student. Researchers never see your email.</p><div class="fld"><label for="rEmail">School email</label><input class="inp" id="rEmail" data-rin="email" type="email" placeholder="you@umak.edu.ph" value="${esc(R.email)}"><div class="err" id="rEmailErr"></div></div><button class="btn ghost" style="align-self:flex-start;padding:8px 0" data-ract="demoEmail">Use a demo email</button>`,`<button class="btn dark block" data-ract="sendCode">Continue</button>`,'intro');}
+    else ph=phone(`<h2 class="ph1">Your email</h2><p class="pp">One payout per respondent. Researchers never see your email.</p><div class="fld"><label for="rEmail">Email</label><input class="inp" id="rEmail" data-rin="email" type="email" placeholder="example@email.com" value="${esc(R.email)}"><div class="err" id="rEmailErr"></div></div><button class="btn ghost" style="align-self:flex-start;padding:8px 0" data-ract="demoEmail">Use a demo email</button>`,`<button class="btn dark block" data-ract="sendCode">Continue</button>`,'intro');}
   else if(step==='consent'){const li=(ic,b,t)=>`<li><span class="ic">${ic}</span><span><b>${b}</b>${t}</span></li>`;
     ph=phone(`<h2 class="ph1">Before you start</h2><p class="pp">Please read this. It takes 20 seconds.</p><ul class="blist">${li(I.doc,`${Q.length} questions, about ${s.mins||4} minutes`,'Nothing is sent until you press Submit.')}${li(I.shield,'Anonymous','Researchers see your answers and wallet, never your email.')}${li(I.wallet,`${peso(s.rate)} for a valid answer`,'Checked by code and AI. Unclear ones go to a person.')}</ul>
       <label class="chk"><input type="checkbox" data-ragree="1" ${R.agree?'checked':''}><span>I'm 18 or older and agree to take part in this study.</span></label><div class="err" id="rAgreeErr" style="margin-top:6px"></div>`,`<button class="btn dark block" data-ract="agree">I agree, start</button>`,'verify');}
@@ -668,7 +668,7 @@ const newSV=(sid,real)=>({sid,real:!!real,step:'intro',email:real?me().email:'',
 let tt,lastUndo=null;
 function toast(m,undo){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;document.getElementById('toastUndo').hidden=!undo;lastUndo=undo||null;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4000)}
 const setErr=(id,m)=>{const e=document.getElementById(id);if(e)e.textContent=m||''};
-const emailOk=e=>/^[^@\s]+@umak\.edu\.ph$/i.test(e.trim());
+const emailOk=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 function nextAfter(id,order){const P=order.filter(x=>x!==id&&!S.decided[x]);if(!P.length)return null;const i=order.indexOf(id);return P.find(x=>order.indexOf(x)>i)||P[0]}
 function decide(d,dec,reason){const order=S.order.slice();S.decided[d.id]={d:dec,reason,seq:++S.seq};S.reasonFor=null;S.reason=0;if(S.openRev===d.id)S.openRev=nextAfter(d.id,order);
   toast(dec==='pay'?`Paid 0.001 tBNB to ${d.wallet}`:d.kind==='appeal'?`Kept unpaid: ${d.wallet}`:`Not paid: ${d.wallet}`,()=>{delete S.decided[d.id];S.openRev=d.id;render();toast('Decision undone')})}
@@ -681,8 +681,8 @@ function act(a,el){if(authAct(a,el))return;const s=SV(S.sid);
     case 'toLanding':S.landing=true;S.auth.stage='email';render();try{window.scrollTo({top:0})}catch(e){}break;
     case 'lpStart':location.assign(el.dataset.to||'/sign-in');break;
     case 'lpScroll':{const t=document.getElementById(el.dataset.to);if(t)t.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});break;}
-    case 'demoAuthEmail':S.auth.email='juan.delacruz@umak.edu.ph';render();break;
-    case 'authEmail':if(!emailOk(S.auth.email))return setErr('aEmailErr','Use your @umak.edu.ph school email.');S.auth.step=1;render();toast('Code sent (demo)');break;
+    case 'demoAuthEmail':S.auth.email='juan.delacruz@email.com';render();break;
+    case 'authEmail':if(!emailOk(S.auth.email))return setErr('aEmailErr','Enter a valid email, like example@email.com.');S.auth.step=1;render();toast('Code sent (demo)');break;
     case 'authMode':S.auth.mode=S.auth.mode==='up'?'in':'up';render();break;
     case 'fillAuthCode':S.auth.code='482913';render();break;
     case 'authVerify':if(S.auth.code!=='482913')return setErr('aCodeErr','That code is wrong. Use the demo code 482913.');S.auth.step=2;render();break;
@@ -729,8 +729,8 @@ function act(a,el){if(authAct(a,el))return;const s=SV(S.sid);
   }}
 function ract(a){const R=S.sv,Q=ANY(R.sid).q;
   switch(a){
-    case 'demoEmail':R.email='maria.santos@umak.edu.ph';render();break;
-    case 'sendCode':if(!emailOk(R.email))return setErr('rEmailErr','Use your school email, like name@umak.edu.ph.');R.verified=true;rgo('consent');break;
+    case 'demoEmail':R.email='maria.santos@email.com';render();break;
+    case 'sendCode':if(!emailOk(R.email))return setErr('rEmailErr','Enter a valid email, like example@email.com.');R.verified=true;rgo('consent');break;
     case 'fillCode':R.code='482913';render();break;
     case 'checkCode':if(R.code!=='482913')return setErr('rCodeErr','That code is wrong. Use the demo code 482913.');R.verified=true;render();break;
     case 'agree':if(!R.agree)return setErr('rAgreeErr','Tick the box to continue.');R.qi=0;rgo('answer');break;
@@ -852,10 +852,10 @@ function resIndC(s){const D=CLOSED_IND[s.id],i=Math.min(S.ri,D.length-1),r=D[i],
 
 /* ================= landing (shown before sign-in) ================= */
 function vLanding(){
-  const steps=[['01','Researcher','Build survey','Google Forms-style builder, five question types.'],['02','Researcher','Fund and lock','Rate × quota + a flat fee per response, locked in tBNB.'],['03','Respondent','Sign in','School email and a verified MetaMask wallet. One submission each.'],['04','Respondent','Answer','Consent and answers. Paid to your verified wallet.'],['05','Code','Code checks','Speed, straight-lining, duplicate text.'],['06','AI','AI label','Labelled twice; flags injection. Can only escalate.'],['07','Rule engine','Decide','Plain code turns signals into Pay, Review or Don\'t pay.']];
+  const steps=[['01','Researcher','Build survey','Google Forms-style builder, five question types.'],['02','Researcher','Fund and lock','Rate × quota + a flat fee per response, locked in tBNB.'],['03','Respondent','Sign in','Email and a verified MetaMask wallet. One submission each.'],['04','Respondent','Answer','Consent and answers. Paid to your verified wallet.'],['05','Code','Code checks','Speed, straight-lining, duplicate text.'],['06','AI','AI label','Labelled twice; flags injection. Can only escalate.'],['07','Rule engine','Decide','Plain code turns signals into Pay, Review or Don\'t pay.']];
   const ev=[['pay','Response #42 · Paid 0.001 tBNB','“Madalas may online class pa ng gabi…”','Taglish · labelled valid twice · BscScan'],['rev','Response #43 · Sent to Review','Instruction-like text flagged','Waits for the researcher, with the AI reason'],['no','Response #44 · Not paid','Required answer was empty','Code-confirmed · logged on-chain']];
   const evIc={pay:I.check,rev:I.clock,no:I.x};
-  const orbit=[[I.doc,'Survey','lp-o1'],[I.mail,'School email','lp-o2'],[I.coins,'Escrow','lp-o3'],[I.shield,'Screening','lp-o4'],[I.ai,'AI label','lp-o5'],[I.link,'BscScan','lp-o6']];
+  const orbit=[[I.doc,'Survey','lp-o1'],[I.mail,'Email','lp-o2'],[I.coins,'Escrow','lp-o3'],[I.shield,'Screening','lp-o4'],[I.ai,'AI label','lp-o5'],[I.link,'BscScan','lp-o6']];
   const start=(cls='')=>`<div class="lp-start ${cls}"><button class="btn lp-primary" data-act="lpStart" data-to="/sign-in?next=%2Fpublish">Publish a survey</button><button class="btn lp-outline" data-act="lpStart" data-to="/sign-in?next=%2Fjoin">Answer a survey</button></div>`;
   return `<div class="lp">
   <header class="lp-nav"><div class="lp-navin"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>

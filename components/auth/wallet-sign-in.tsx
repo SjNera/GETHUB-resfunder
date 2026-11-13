@@ -46,7 +46,7 @@ export function WalletSignIn() {
         <div>
           <label htmlFor="si-email" className="mb-2 block text-[15px] font-semibold">Email</label>
           <input id="si-email" type="email" autoComplete="email" className={inputCls} value={email} disabled={busy || isPending}
-            onChange={(e) => setEmail(e.target.value)} placeholder="you@school.edu" aria-invalid={touched && !isEmail(email)} />
+            onChange={(e) => setEmail(e.target.value)} placeholder="example@email.com" aria-invalid={touched && !isEmail(email)} />
           {touched && !isEmail(email) && <p role="alert" className="mt-2 text-sm text-dontpay">Enter a valid email address.</p>}
         </div>
         <Button variant="primary" size="lg" type="submit" disabled={busy || isPending}>

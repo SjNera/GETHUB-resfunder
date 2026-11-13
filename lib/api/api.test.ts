@@ -396,7 +396,7 @@ describe('R5 submit', () => {
     ]) {
       expectError(await bad(email), 'INVALID_INPUT');
     }
-    for (const email of ['juan.delacruz@umak.edu.ph', 'j_d+survey%1@mail-server.example.org']) {
+    for (const email of ['example@email.com', 'j_d+survey%1@mail-server.example.org']) {
       db.reset();
       await register();
       expect((await bad(email)).status).toBe(200);
