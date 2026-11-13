@@ -13,7 +13,7 @@ Everything below is a command or a value. Put values in `.env` (git-ignored). Ne
 | Verification | BscScan (Etherscan API v2 key) | `BSCSCAN_API_KEY` |
 
 Also generate two secrets: `openssl rand -hex 32` for `HASH_SECRET` and again for `BETTER_AUTH_SECRET`.
-Set `BETTER_AUTH_URL` to the address the browser uses (`http://localhost:3000` in dev, the Vercel URL in production).
+Set `BETTER_AUTH_URL=http://localhost:3000` for local dev. On Vercel, leave it unset (see section 6).
 
 ## 2. Database
 
@@ -64,6 +64,41 @@ npm run e2e                # full run: deployed contract, real screening
 2. `/publish`: build questions, set rate, quota and deadline, then Fund.
 3. Open the share link `/s/<id>` in a second browser profile, sign in with another wallet, and answer.
 4. `/surveys`: open the survey, check the decision log, then Close and refund.
+
+## 6. Deploy on Vercel
+
+Vercel detects Next.js; no `vercel.json` is needed. Build command `npm run build`, Node.js 24.
+
+1. Import the GitHub repo `SjNera/GETHUB-resfunder` in Vercel (New Project → Import Git Repository), root directory `/`,
+   framework Next.js. The `contracts/` package is not built. With the repo connected, **every push deploys**: a push to
+   `main` deploys Production, a push to any other branch (and each pull request) gets its own Preview URL. Keep
+   Settings → Git → "Automatically deploy" on (the default). No workflow file or token is needed.
+2. Add the environment variables below in Project Settings → Environment Variables. Never add `DEPLOYER_PRIVATE_KEY`
+   or the `E2E_*` keys to Vercel.
+
+| Name | Environments | Note |
+|---|---|---|
+| `NEXT_PUBLIC_CHAIN_ID` | all | `97`. Read at build time |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | all | Read at build time: redeploy after changing it |
+| `CHAIN_RPC_URL`, `CHAIN_RPC_FALLBACK` | all | |
+| `AGENT_PRIVATE_KEY` | all | Sensitive |
+| `FEE_PER_RESPONSE_WEI` | all | |
+| `GROQ_API_KEY`, `GROQ_MODEL` | all | `GROQ_API_KEY` sensitive |
+| `DATABASE_URL` | all | Neon pooled string. A separate Neon branch for Preview keeps test data apart |
+| `HASH_SECRET` | all | Sensitive. The same value as before: changing it breaks duplicate-email checks |
+| `BETTER_AUTH_SECRET` | all | Sensitive, 32+ characters |
+| `REQUIRE_RESEARCHER_AUTH` | all | `true` |
+| `BETTER_AUTH_URL` | Production only, optional | Only for a custom domain, e.g. `https://resfunder.app` |
+
+3. `BETTER_AUTH_URL` decides which address the wallet sign-in accepts. Unset on Vercel, the app uses
+   `VERCEL_PROJECT_PRODUCTION_URL` in production and `VERCEL_BRANCH_URL` on previews
+   (`lib/auth/better-auth.ts`, `appUrl()`). Open a preview from its branch URL, not the per-commit URL, or set
+   `BETTER_AUTH_URL` for that environment. Setting it to the production URL for Preview breaks preview sign-in.
+4. Before the first production deploy, create the tables in the production database:
+   `npm run db:apply && npm run db:apply:auth && npm run db:apply:app` with that `DATABASE_URL` in `.env`.
+5. After deploying: open the site, Create account (MetaMask on BSC Testnet), log out, log in with email and password,
+   fund a small survey, answer it from a second wallet, and check the decision log.
+6. `/lab` is off in production (`labEnabled()` needs `LAB_ENABLED=true` and a non-production build). Don't set `LAB_ENABLED` on Vercel.
 
 ## Known limits
 
