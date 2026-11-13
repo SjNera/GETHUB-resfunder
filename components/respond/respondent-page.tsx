@@ -113,7 +113,7 @@ function Respondent({ surveyId, defaultEmail }: { surveyId: number; defaultEmail
         <form className="mt-8 grid gap-6" onSubmit={(e) => { e.preventDefault(); void submit(); }} noValidate>
           <div>
             <label htmlFor="r-email" className="mb-2 block text-[15px] font-semibold">Your email</label>
-            <input id="r-email" type="email" className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy !== "idle"} placeholder="you@school.edu" />
+            <input id="r-email" type="email" className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy !== "idle"} placeholder="example@email.com" />
             {problems.email && <p role="alert" className="mt-2 text-sm text-dontpay">{problems.email}</p>}
           </div>
 

@@ -4,7 +4,7 @@ import { cn } from "@/lib/ui/cn";
 
 const chips: { icon: ReactNode; label: string; className: string }[] = [
   { icon: <FileText />, label: "Survey builder", className: "left-[14%] top-[14%]" },
-  { icon: <Mail />, label: "School email", className: "left-[5%] top-[44%]" },
+  { icon: <Mail />, label: "Email", className: "left-[5%] top-[44%]" },
   { icon: <Sparkles />, label: "AI label", className: "left-[22%] top-[52%] hidden lg:grid" },
   { icon: <Scale />, label: "Rule engine", className: "left-[10%] top-[76%]" },
   { icon: <Coins />, label: "Escrow", className: "right-[14%] top-[14%]" },
