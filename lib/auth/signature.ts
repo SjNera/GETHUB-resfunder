@@ -5,6 +5,7 @@ import { verifyMessage } from 'viem';
 import { ApiFailure } from '../api/errors';
 import type { AuthAction, AuthProof, Hex } from '../types';
 import { buildAuthMessage } from './message';
+import { getSessionUser } from './session';
 
 const MAX_AGE_MS = 10 * 60 * 1000;
 const MAX_FUTURE_MS = 60 * 1000;
@@ -93,6 +94,11 @@ export async function verifyResearcher(headers: Headers, action: AuthAction, sur
     return wallet.toLowerCase();
   }
   const proof = proofFromHeaders(headers);
-  if (!proof) throw notVerified('The auth headers are missing or malformed.');
-  return verifyAuth(proof, action, surveyId);
+  if (proof) return verifyAuth(proof, action, surveyId);
+  // No signature sent: the wallet that signed in (SIWE) is already proven by the session cookie.
+  if (headers.get('cookie')) {
+    const user = await getSessionUser(headers);
+    if (user) return user.wallet;
+  }
+  throw notVerified('The auth headers are missing or malformed.');
 }

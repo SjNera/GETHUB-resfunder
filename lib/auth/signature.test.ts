@@ -5,6 +5,10 @@ import type { AuthAction, AuthProof } from '../types';
 import { buildAuthMessage } from './message';
 import { emailHash, proofFromHeaders, verifyAuth, verifyResearcher } from './signature';
 
+const sessionUser = vi.hoisted(() => vi.fn());
+vi.mock('./session', () => ({ getSessionUser: sessionUser }));
+beforeEach(() => sessionUser.mockReset());
+
 const signer = privateKeyToAccount(generatePrivateKey());
 const other = privateKeyToAccount(generatePrivateKey());
 
@@ -117,6 +121,26 @@ describe('researcher headers', () => {
   it('rejects missing headers', async () => {
     await expectNotVerified(verifyResearcher(new Headers(), 'list_surveys', 0));
     await expectNotVerified(verifyResearcher(new Headers({ 'x-auth-wallet': signer.address }), 'list_surveys', 0));
+  });
+
+  it('accepts the signed-in session wallet when no signature is sent', async () => {
+    sessionUser.mockResolvedValueOnce({ userId: 'u', email: 'a@b.co', wallet: signer.address.toLowerCase() });
+    const h = new Headers({ cookie: 'better-auth.session_token=x' });
+    expect(await verifyResearcher(h, 'view_log', 3)).toBe(signer.address.toLowerCase());
+  });
+
+  it('rejects a cookie with no valid session, and ignores sessions when there is no cookie', async () => {
+    sessionUser.mockResolvedValueOnce(null);
+    await expectNotVerified(verifyResearcher(new Headers({ cookie: 'a=b' }), 'view_log', 3));
+    await expectNotVerified(verifyResearcher(new Headers(), 'view_log', 3));
+    expect(sessionUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('still checks a sent signature even when a session exists', async () => {
+    const h = await headersFor('list_surveys', 0);
+    h.set('cookie', 'a=b');
+    expect(await verifyResearcher(h, 'list_surveys', 0)).toBe(signer.address.toLowerCase());
+    expect(sessionUser).not.toHaveBeenCalled();
   });
 
   it('skips verification only when REQUIRE_RESEARCHER_AUTH is false', async () => {

@@ -47,7 +47,7 @@ async function call<T>(path: string, init: Init = {}, fetcher: typeof fetch = fe
 export const api = {
   fee: () => call<{ feePerResponseWei: WeiString }>("/api/fee"),
   register: (txHash: Hex, survey: SurveyJson) => call<RegisterResult>("/api/surveys", { method: "POST", body: { txHash, survey } }),
-  list: (proof: AuthProof) => call<{ surveys: SurveySummary[] }>("/api/surveys", { headers: authHeaders(proof) }),
+  list: (proof?: AuthProof) => call<{ surveys: SurveySummary[] }>("/api/surveys", { headers: proof ? authHeaders(proof) : {} }),
   decide: (responseId: string, decision: "pay" | "dont_pay", reason?: string) =>
     call<ResponseResult>(`/api/responses/${encodeURIComponent(responseId)}/decide`, { method: "POST", body: { decision, reason } }),
   saveProfile: (profile: Record<string, unknown>) =>
@@ -59,7 +59,7 @@ export const api = {
     call<SubmitResult>("/api/submit", { method: "POST", body: b }),
   process: (responseId: string) => call<ResponseResult>(`/api/process/${encodeURIComponent(responseId)}`, { method: "POST" }),
   response: (responseId: string) => call<ResponseResult>(`/api/responses/${encodeURIComponent(responseId)}`),
-  log: (id: number, proof: AuthProof) => call<LogResponse>(`/api/surveys/${id}/log`, { headers: authHeaders(proof) }),
+  log: (id: number, proof?: AuthProof) => call<LogResponse>(`/api/surveys/${id}/log`, { headers: proof ? authHeaders(proof) : {} }),
   pause: (id: number, paused: boolean, auth: AuthProof) =>
     call<{ surveyId: number; paused: boolean }>(`/api/surveys/${id}/pause`, { method: "POST", body: { paused, auth } }),
   closed: (id: number, txHash: Hex) => call<ClosedResult>(`/api/surveys/${id}/closed`, { method: "POST", body: { txHash } }),
