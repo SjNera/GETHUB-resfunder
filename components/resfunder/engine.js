@@ -5,7 +5,6 @@ export function startResFunder(bridge) {
   if (started) return;
   started = true;
 (function(){
-const FLOWS='https://claude.ai/artifact/Heuys32xNT1X8TgYKwLYLX';
 const sv=p=>'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
 const I={check:sv('<path d="M3.5 8.5l3 3 6-7"/>'),x:sv('<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>'),clock:sv('<circle cx="8" cy="8" r="6"/><path d="M8 5v3.2l2 1.3"/>'),
   chev:sv('<path d="M6 4l4 4-4 4"/>'),chevL:sv('<path d="M10 4L6 8l4 4"/>'),down:sv('<path d="M4 6l4 4 4-4"/>'),arrow:sv('<path d="M3 8h10M9 4l4 4-4 4"/>'),
@@ -580,7 +579,7 @@ function vSettings(){const M=me();
 function vHelp(){const f=[['How does screening decide who gets paid?','Code checks run first (empty, gibberish, duplicate, too fast, same option repeated). Then the AI labels each written answer twice. Published rules decide: Pay, Review or Don\'t pay. The AI can only send a response to Review; it can\'t block payment.'],
   ['What happens to a response in review?','It stays unpaid and shows in the survey\'s review queue with the reason. You pay it, or reject it with a reason. Either way it is recorded on chain and can\'t be undone. Nothing is paid or rejected by itself.'],
   ['What does the fee cover?','A flat fee per response ('+D.fee+') covers the network cost of each payment decision and running the screening. It isn\'t refunded when you close a survey; unused budget is.'],['Is this real money?','No. ResFunder runs on BSC Testnet with tBNB test tokens.']];
-  return header('','Help and support',`<a class="btn" href="${FLOWS}" target="_blank" rel="noopener">View user flows</a>`)+`<section class="card pad faq" style="max-width:820px">${f.map((x,i)=>`<details ${i?'':'open'}><summary>${x[0]}${I.down.replace('<svg','<svg style="width:16px;height:16px;flex:none"')}</summary><p>${x[1]}</p></details>`).join('')}</section>`}
+  return header('','Help and support','')+`<section class="card pad faq" style="max-width:820px">${f.map((x,i)=>`<details ${i?'':'open'}><summary>${x[0]}${I.down.replace('<svg','<svg style="width:16px;height:16px;flex:none"')}</summary><p>${x[1]}</p></details>`).join('')}</section>`}
 /* ================= student view (respondent page) ================= */
 /* Three screens, like a form: (1) intro and consent, (2) every question on one page with Submit at the end,
    (3) the result. A "ticket" anchors each screen: what the survey pays and how far along you are; at the end it is the receipt.
