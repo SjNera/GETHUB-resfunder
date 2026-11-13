@@ -439,18 +439,26 @@ function vBuild(s){
     <aside class="preview"><div class="ph2">${I.eye}Live preview, exactly what respondents see</div><div id="bPrev">${formPreview(s,false)}</div></aside></div>
   <div class="bbar"><span class="ok" id="buildNote">${I.check}Saved in this browser · ${s.q.length} question${s.q.length===1?'':'s'}</span><button class="btn dark pill" data-act="toFund">Continue to funding ${I.arrow}</button></div>`;
 }
-const fundIn=s=>({rate:String(s.rateIn==null?'':s.rateIn),quota:String(s.quota==null?'':s.quota),deadline:s.deadline||''});
+/* The researcher types one total (fee included); the bridge derives the rate the contract needs. */
+const fundIn=s=>({total:String(s.totalIn==null?'':s.totalIn),quota:String(s.quota==null?'':s.quota),deadline:s.deadline||''});
 const FUNDL={connecting:'Connecting wallet…',confirm:'Confirm in MetaMask…',mining:'Waiting for the network…',registering:'Registering your survey…'};
+/* Shown under the inputs: what each valid answer pays, as soon as budget and quota allow it. */
+function rateBox(s,Q){
+  if(Q.rate==='—'){const msg=String(s.totalIn||'').trim()&&Q.errors.total?Q.errors.total:'Enter your total budget and the responses you need to see the pay per answer.';
+    return `<div class="rateline off">${I.coins}<span>${esc(msg)}</span></div>`}
+  return `<div class="rateline">${I.coins}<span>Each valid answer pays <b>${esc(Q.rate)}</b><small>${esc(Q.budget)} for ${esc(s.quota)} respondent${+s.quota===1?'':'s'} · ${esc(Q.fee)} fee</small></span></div>`+
+    (Q.warning?`<p class="ratewarn" role="status">${esc(Q.warning)}</p>`:'')}
 function vFund(s){const Q=B.quote(s,fundIn(s)),busy=FUNDL[S.busy]?S.busy:'',dis=busy?'disabled':'';
-  return pendBar()+`<div class="fund"><div style="min-width:0"><section class="card pad"><h2 class="h">Rate, quota and deadline</h2><p class="muted" style="margin:0">These are written into the contract and can't change after funding.</p>
-      <div class="f3"><div class="fld"><label for="fRate">Pay per valid response (tBNB)</label><input class="inp" id="fRate" data-fin="rateIn" type="text" inputmode="decimal" autocomplete="off" placeholder="0.001" value="${esc(s.rateIn==null?'':s.rateIn)}" ${dis}></div>
+  return pendBar()+`<div class="fund"><div style="min-width:0"><section class="card pad"><h2 class="h">Budget, quota and deadline</h2><p class="muted" style="margin:0">Enter what you can spend in total. We split it across your quota. The pay per answer, quota and deadline are written into the contract and can't change after funding.</p>
+      <div class="f3"><div class="fld"><label for="fTotal">Total budget (tBNB)</label><input class="inp" id="fTotal" data-fin="totalIn" type="text" inputmode="decimal" autocomplete="off" placeholder="0.02" aria-describedby="fTotalHint" value="${esc(s.totalIn==null?'':s.totalIn)}" ${dis}><span class="hint" id="fTotalHint">Includes the platform fee.</span></div>
         <div class="fld"><label for="fQuota">Responses needed</label><input class="inp" id="fQuota" data-fin="quota" type="number" min="1" step="1" value="${esc(s.quota==null?'':s.quota)}" ${dis}></div>
-        <div class="fld"><label for="fDl">Deadline</label><input class="inp" id="fDl" data-fin="deadline" type="date" value="${esc(s.deadline||'')}" ${dis}></div></div><div class="err" id="fundErr" role="alert">${esc(S.fundErr)}</div></section>
+        <div class="fld"><label for="fDl">Deadline</label><input class="inp" id="fDl" data-fin="deadline" type="date" value="${esc(s.deadline||'')}" ${dis}></div></div>
+      <div id="rateBox" aria-live="polite">${rateBox(s,Q)}</div><div class="err" id="fundErr" role="alert">${esc(S.fundErr)}</div></section>
     <div class="cc"><section class="card"><h4><span style="color:var(--green)">${I.shield}</span>The contract can</h4><p>Pay only the fixed rate per response, to respondents of this survey, once each, within the quota.</p><p>Return the unused budget to you when you close the survey.</p></section>
       <section class="card"><h4><span style="color:var(--red)">${I.x}</span>The contract can't</h4><p>Send your budget anywhere except respondents or back to you.</p><p>Change the rate, quota, deadline or questions.</p></section></div>
     <button class="btn ghost" style="margin-top:14px" data-act="toBuild" ${dis}>${I.back}Back to questions</button></div>
-    <aside class="card pad sum"><div class="line"><span id="sBl">Budget (${Q.rate} × ${esc(s.quota||0)})</span><span id="sB">${Q.budget}</span></div><div class="line"><span id="sFl">Fee (${Q.feeEach} × ${esc(s.quota||0)})</span><span id="sF">${Q.fee}</span></div>
-      <div class="tot"><span style="font-weight:600">You deposit</span><b id="sD">${Q.deposit}</b></div><p class="hint" style="margin:8px 0 0">Paid in tBNB from ${S.wallet?shortW(S.wallet):'your wallet'}. The fee isn't refundable; unused budget is.</p>
+    <aside class="card pad sum"><div class="line"><span id="sBl">Respondents (${Q.rate} × ${esc(s.quota||0)})</span><span id="sB">${Q.budget}</span></div><div class="line"><span id="sFl">Fee (${Q.feeEach} × ${esc(s.quota||0)})</span><span id="sF">${Q.fee}</span></div>
+      <div class="tot"><span style="font-weight:600">You deposit</span><b id="sD">${Q.deposit}</b></div><p class="hint" id="sLo" style="margin:8px 0 0"${Q.leftover?'':' hidden'}>${Q.leftover?'Rounding keeps '+Q.leftover+' in your wallet.':''}</p><p class="hint" style="margin:8px 0 0">Paid in tBNB from ${S.wallet?shortW(S.wallet):'your wallet'}. The fee isn't refundable; unused budget is.</p>
       <button class="fundbtn" data-act="fund" ${busy?'disabled aria-busy="true"':''}><span class="fx">${fx}</span><span id="fundLbl">${busy?FUNDL[busy]:'Fund survey'+(Q.ok?' '+Q.deposit:'')}</span></button>
       <p class="fundnote">Opens MetaMask to approve and lock the budget in one step.</p></aside></div>`}
 function vLiveShare(s){const F=S.launched[s.id];
@@ -574,7 +582,7 @@ function phone(body,foot,back){return `<div class="phone"><div class="sbar3"><sp
   <div class="pnav"><span class="brand"><span class="logo" aria-hidden="true"></span>ResFunder</span>${back?`<button class="btn ghost back" data-rgo="${back}">${I.back}Back</button>`:''}</div><div class="pbody">${body}</div>${foot?`<div class="pfoot">${foot}</div>`:''}</div>`}
 /* Two ways in: live (a real survey and a real submission) and the researcher's preview of their own survey (nothing is sent). */
 function vStudent(){const R=S.sv,s=R.s,Q=s.q;let ph='';
-  const step=R.step,rate=typeof s.rate==='string'?s.rate:s.rate!=null?peso(s.rate):(s.rateIn||'0')+' tBNB';
+  const step=R.step,rate=typeof s.rate==='string'?s.rate:s.rate!=null?peso(s.rate):(()=>{const r=B.quote(s,fundIn(s)).rate;return r==='—'?'0 tBNB':r})();
   const mins=s.mins||Math.max(1,Math.round(Q.length/2)),spots=s.slotsLeft!=null?s.slotsLeft:Math.max(0,(+s.quota||0)-(s.paid!=null?s.paid:s.resp||0)),closes=s.closesFull||fmtDate(s.deadline);
   if(step==='intro')ph=phone(`<div class="intro"><div class="g">${esc(s.group||(s.code?s.code+' · ':'')+'Paid survey on BSC Testnet')}</div><h2>${esc(s.title||'Untitled survey')}</h2><p>${esc(s.desc||'')}</p><div class="s3"><div><b>${rate}</b><span>per valid answer</span></div><div><b>${mins}m</b><span>to complete</span></div><div><b>${spots}</b><span>paid spots left</span></div></div><div class="cl">Closes ${closes}</div></div>`,`<button class="btn dark block" data-rgo="${R.live?'consent':'verify'}">Start survey</button><span class="hint" style="text-align:center">${R.live?'Signed in as '+esc(me().email)+'.':'Respondents sign in with their email and wallet first.'}</span>`);
   else if(step==='verify'){
@@ -632,7 +640,7 @@ const setErr=(id,m)=>{const e=document.getElementById(id);if(e)e.textContent=m||
 const emailOk=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 function copy(v,msg){try{navigator.clipboard.writeText(v).then(()=>toast(msg),()=>toast(v))}catch(e){toast(v)}}
 function newDraft(){const dl=new Date(Date.now()+14*864e5),p=n=>String(n).padStart(2,'0');
-  const d={id:'d'+Date.now().toString(36),status:'draft',title:'',desc:'',rateIn:'0.001',quota:10,deadline:`${dl.getFullYear()}-${p(dl.getMonth()+1)}-${p(dl.getDate())}`,q:[{t:'',type:'mc',req:true,opts:['Option 1','Option 2']}]};
+  const d={id:'d'+Date.now().toString(36),status:'draft',title:'',desc:'',totalIn:'0.02',quota:10,deadline:`${dl.getFullYear()}-${p(dl.getMonth()+1)}-${p(dl.getDate())}`,q:[{t:'',type:'mc',req:true,opts:['Option 1','Option 2']}]};
   SURVEYS.unshift(d);saveDrafts();S.sid=d.id;S.page='survey';S.stab='build';S.draft[d.id]='build';S.fundErr='';S.sideOpen=false;render();try{window.scrollTo({top:0})}catch(e){}}
 /* The funded survey replaces its draft and opens on the share step. */
 function funded(draftId,F){S.busy='';S.fundErr='';D.pend=null;
@@ -670,7 +678,7 @@ function act(a,el){if(authAct(a))return;const s=SV(S.sid);
     case 'delQ':if(s.q.length<=1)return toast('A survey needs at least one question');s.q.splice(+el.dataset.i,1);saveDrafts();render();break;
     case 'toFund':{const er=B.quote(s,fundIn(s)).errors.survey;if(er)return toast(er);S.draft[s.id]='fund';S.fundErr='';render();try{window.scrollTo({top:0})}catch(e){}break;}
     case 'toBuild':S.draft[s.id]='build';render();break;
-    case 'fund':{if(S.busy)return;const Q=B.quote(s,fundIn(s)),er=Q.errors.survey||Q.errors.rate||Q.errors.quota||Q.errors.deadline;
+    case 'fund':{if(S.busy)return;const Q=B.quote(s,fundIn(s)),er=Q.errors.survey||Q.errors.total||Q.errors.quota||Q.errors.deadline;
       if(er||!Q.ok){S.fundErr=er||'The fee is still loading. Try again in a moment.';return setErr('fundErr',S.fundErr)}
       const id=s.id;S.fundErr='';S.busy='connecting';render();
       B.fund(s,fundIn(s),p=>{S.busy=p;if(S.page==='survey'&&S.sid===id)render()}).then(F=>funded(id,F),e=>{S.busy='';S.fundErr=B.text(e);D.pend=B.pendingFund();render()});break;}
@@ -743,7 +751,9 @@ function refreshLog(){const b=document.getElementById('logBody');if(b)b.innerHTM
 function refreshPlot(){const w=document.getElementById('plotWrap');if(w)w.innerHTML=plot()}
 /* The deposit preview follows the three fund inputs without redrawing them. */
 function refreshFund(){const s=SV(S.sid);if(!s||s.status!=='draft')return;const Q=B.quote(s,fundIn(s)),set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
-  set('sBl','Budget ('+Q.rate+' × '+(s.quota||0)+')');set('sFl','Fee ('+Q.feeEach+' × '+(s.quota||0)+')');set('sB',Q.budget);set('sF',Q.fee);set('sD',Q.deposit);set('fundLbl','Fund survey'+(Q.ok?' '+Q.deposit:''));S.fundErr='';setErr('fundErr','')}
+  set('sBl','Respondents ('+Q.rate+' × '+(s.quota||0)+')');set('sFl','Fee ('+Q.feeEach+' × '+(s.quota||0)+')');set('sB',Q.budget);set('sF',Q.fee);set('sD',Q.deposit);set('fundLbl','Fund survey'+(Q.ok?' '+Q.deposit:''));
+  const lo=document.getElementById('sLo');if(lo){lo.hidden=!Q.leftover;lo.textContent=Q.leftover?'Rounding keeps '+Q.leftover+' in your wallet.':''}
+  const rb=document.getElementById('rateBox');if(rb)rb.innerHTML=rateBox(s,Q);S.fundErr='';setErr('fundErr','')}
 function refreshPrev(){const p=document.getElementById('bPrev');if(p)p.innerHTML=formPreview(SV(S.sid),false)}
 document.addEventListener('input',e=>{const t=e.target,d=t.dataset;if(!d)return;
   if(d.pft){pf()[d.pft]=t.value;setErr('aPfErr','');return}
@@ -803,7 +813,7 @@ B.session().then(sess=>{if(sess)enter(sess);else{S.boot=false;render();lpAnchor(
 
 /* ================= landing (shown before sign-in) ================= */
 function vLanding(){
-  const steps=[['01','Researcher','Build survey','Google Forms-style builder, three question types.'],['02','Researcher','Fund and lock','Rate × quota + a flat fee per response, locked in tBNB.'],['03','Respondent','Sign in','Email and a verified MetaMask wallet. One submission each.'],['04','Respondent','Answer','Consent and answers. Paid to your verified wallet.'],['05','Code','Code checks','Speed, straight-lining, duplicate text.'],['06','AI','AI label','Labelled twice; flags injection. Can only escalate.'],['07','Rule engine','Decide','Plain code turns signals into Pay, Review or Don\'t pay.']];
+  const steps=[['01','Researcher','Build survey','Google Forms-style builder, three question types.'],['02','Researcher','Fund and lock','One total budget, fee included, split across your quota and locked in tBNB.'],['03','Respondent','Sign in','Email and a verified MetaMask wallet. One submission each.'],['04','Respondent','Answer','Consent and answers. Paid to your verified wallet.'],['05','Code','Code checks','Speed, straight-lining, duplicate text.'],['06','AI','AI label','Labelled twice; flags injection. Can only escalate.'],['07','Rule engine','Decide','Plain code turns signals into Pay, Review or Don\'t pay.']];
   const ev=[['pay','Response #42 · Paid 0.001 tBNB','“Madalas may online class pa ng gabi…”','Taglish · labelled valid twice · BscScan'],['rev','Response #43 · Sent to Review','Instruction-like text flagged','Waits for the researcher, with the AI reason'],['no','Response #44 · Not paid','Required answer was empty','Code-confirmed · logged on-chain']];
   const evIc={pay:I.check,rev:I.clock,no:I.x};
   const orbit=[[I.doc,'Survey','lp-o1'],[I.mail,'Email','lp-o2'],[I.coins,'Escrow','lp-o3'],[I.shield,'Screening','lp-o4'],[I.ai,'AI label','lp-o5'],[I.link,'BscScan','lp-o6']];
@@ -833,7 +843,7 @@ function vLanding(){
       <li class="lp-outcome"><span class="lp-sm">Outcome</span><div><span>${I.check}Pay, in seconds</span><span>${I.clock}Review, by the researcher</span><span>${I.x}Don't pay, reason logged</span></div></li></ol></div></section>
 
   <section class="lp-aud"><h2>Built for thesis budgets, not research labs.</h2><p class="lp-lead2">One flat fee per response, shown in tBNB before you sign. Incumbent panels charge 20–40% and price out a thesis-sized budget.</p>
-    <div class="lp-big">${[['1 deposit','Researchers','Rate × quota plus a flat fee per response, locked once. Unused budget comes back to your wallet at close.'],['Seconds','Students','Paid the fixed rate in tBNB for an honest answer, with a BscScan receipt. Taglish and short answers are fine.'],['Every','Advisers','Every decision is logged with its reason, the rubric version and the model version.']].map(([b,l,d])=>`<div><p class="lp-num">${b}</p><b>${l}</b><p>${d}</p></div>`).join('')}</div></section>
+    <div class="lp-big">${[['1 deposit','Researchers','One total budget, fee included, split across your quota and locked once. Unused budget comes back to your wallet at close.'],['Seconds','Students','Paid the fixed rate in tBNB for an honest answer, with a BscScan receipt. Taglish and short answers are fine.'],['Every','Advisers','Every decision is logged with its reason, the rubric version and the model version.']].map(([b,l,d])=>`<div><p class="lp-num">${b}</p><b>${l}</b><p>${d}</p></div>`).join('')}</div></section>
 
   <section class="lp-rules" id="lp-rules"><div class="lp-cards">
     <div><span class="lp-tag ok">${I.check}Pay</span><p>No hard failure, at most one weak signal, and both AI checks agree the answer is valid.</p></div>

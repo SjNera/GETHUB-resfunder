@@ -67,12 +67,18 @@ async function untilVerified<T>(call: () => Promise<T>): Promise<T> {
 export type Session = { email: string; wallet: string | null };
 export type Quote = {
   ok: boolean;
-  errors: { rate?: string; quota?: string; deadline?: string; survey?: string };
+  errors: { total?: string; quota?: string; deadline?: string; survey?: string };
+  /** Pay per valid response, derived from the total budget. */
   rate: string;
+  /** rate × quota, what respondents can receive in all. */
   budget: string;
   fee: string;
   feeEach: string;
   deposit: string;
+  /** Wei left in the wallet by rounding the rate down; "" when none. */
+  leftover: string;
+  /** The fee is most of the deposit. */
+  warning?: string;
 };
 export type FundPhase = "connecting" | "confirm" | "mining" | "registering";
 export type Funded = { survey: EngineSurvey & { q: EngineQuestion[]; desc: string }; tx: string; txUrl: string; link: string; budget: string; fee: string; deposit: string };
@@ -245,15 +251,19 @@ export function createBridge() {
 
     /** Deposit preview for the fund step. Needs feeEach() to have resolved once. */
     quote(draft: EngineDraft, input: FundingInput): Quote {
-      const empty = { rate: "—", budget: "—", fee: "—", deposit: "—" };
+      const empty = { rate: "—", budget: "—", fee: "—", deposit: "—", leftover: "" };
       const feeEach = feeWei === null ? "…" : bnb(feeWei);
       const v = validate({ title: draft.title, description: draft.desc, questions: draftToSurvey(draft).questions });
       const problems = [v.errors.title, ...v.errors.general, ...Object.values(v.errors.questions).flat()].filter(Boolean);
       if (feeWei === null) return { ok: false, errors: {}, feeEach, ...empty };
       const plan = planFunding(v.survey, input, feeWei, Date.now());
-      if (!plan.ok) return { ok: false, errors: { ...plan.errors, survey: problems[0] }, feeEach, ...empty };
-      const p = plan.plan;
-      return { ok: v.ok, errors: { survey: problems[0] }, feeEach, rate: bnb(p.rate), budget: bnb(p.budget), fee: bnb(p.fee), deposit: bnb(p.deposit) };
+      // The split shows as soon as budget and quota are valid, even if the deadline isn't yet.
+      const s = plan.ok ? plan.plan : plan.split;
+      const shown = s
+        ? { rate: bnb(s.rate), budget: bnb(s.budget), fee: bnb(s.fee), deposit: bnb(s.deposit), leftover: s.leftover > BigInt(0) ? `${s.leftover} wei` : "", warning: s.warning }
+        : empty;
+      if (!plan.ok) return { ok: false, errors: { ...plan.errors, survey: problems[0] }, feeEach, ...shown };
+      return { ok: v.ok, errors: { survey: problems[0] }, feeEach, ...shown };
     },
 
     /** createSurvey from the user's wallet, wait for the receipt, register with the server. */
@@ -261,7 +271,7 @@ export function createBridge() {
       const v = validate({ title: draft.title, description: draft.desc, questions: draftToSurvey(draft).questions });
       if (!v.ok) throw new Error("Fix the survey questions first.");
       const plan = planFunding(v.survey, input, await fee(), Date.now());
-      if (!plan.ok) throw new Error(Object.values(plan.errors)[0] ?? "Check the rate, quota and deadline.");
+      if (!plan.ok) throw new Error(Object.values(plan.errors)[0] ?? "Check the budget, quota and deadline.");
       const p = plan.plan;
       onPhase("connecting");
       const account = await wallet();

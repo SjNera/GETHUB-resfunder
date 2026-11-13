@@ -37,7 +37,7 @@ const savePending = (p: Pending | null) => {
 const msg = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
 
 export function FundStep({ survey, onBack, onFunded }: { survey: SurveyJson; onBack: () => void; onFunded: () => void }) {
-  const [fund, setFund] = useState({ rate: "0.001", quota: "100", deadline: "" });
+  const [fund, setFund] = useState({ total: "0.2", quota: "100", deadline: "" });
   const [tried, setTried] = useState(false);
   const [nowMs] = useState(() => Date.now());
   const [fee, setFee] = useState<{ wei: bigint | null; error: string | null; loading: boolean }>({ wei: null, error: null, loading: true });
@@ -137,14 +137,14 @@ export function FundStep({ survey, onBack, onFunded }: { survey: SurveyJson; onB
   return (
     <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
       <section className="rounded-2xl border border-border bg-surface p-5">
-        <h2 className="text-lg font-semibold">Rate, quota and deadline</h2>
+        <h2 className="text-lg font-semibold">Budget, quota and deadline</h2>
         <p className="mt-1 text-sm text-muted">These are written into the contract and can’t change after funding.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          {([["rate", "Pay per response (tBNB)", "text"], ["quota", "Responses wanted", "number"], ["deadline", "Deadline", "date"]] as const).map(([k, l, type]) => (
+          {([["total", "Total budget, fee included (tBNB)", "text"], ["quota", "Responses wanted", "number"], ["deadline", "Deadline", "date"]] as const).map(([k, l, type]) => (
             <div key={k}>
               <label htmlFor={`sb-${k}`} className="mb-2 block text-[15px] font-semibold">{l}</label>
               <input id={`sb-${k}`} type={type} className={inputCls} value={fund[k]} disabled={busy}
-                inputMode={k === "rate" ? "decimal" : undefined}
+                inputMode={k === "total" ? "decimal" : undefined}
                 onChange={(e) => setFund({ ...fund, [k]: e.target.value })} />
               {tried && plan && !plan.ok && plan.errors[k] && <p role="alert" className="mt-2 text-sm text-dontpay">{plan.errors[k]}</p>}
             </div>
@@ -159,7 +159,8 @@ export function FundStep({ survey, onBack, onFunded }: { survey: SurveyJson; onB
         {fee.error && <p role="alert" className="text-sm text-dontpay">Can’t load the fee: {fee.error}</p>}
         {plan?.ok ? (
           <dl className="grid gap-2 text-sm" data-testid="summary">
-            <div className="flex justify-between"><dt className="text-muted">Budget</dt><dd>{bnbAmount(plan.plan.budget, 6)} tBNB</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Pay per answer</dt><dd>{bnbAmount(plan.plan.rate, 8)} tBNB</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Respondents</dt><dd>{bnbAmount(plan.plan.budget, 6)} tBNB</dd></div>
             <div className="flex justify-between"><dt className="text-muted">Fee</dt><dd>{bnbAmount(plan.plan.fee, 6)} tBNB</dd></div>
             <div className="flex justify-between border-t border-border pt-2 font-semibold"><dt>You deposit</dt><dd>{bnbAmount(plan.plan.deposit, 6)} tBNB</dd></div>
             <div className="flex justify-between text-muted"><dt>Survey hash</dt><dd className="font-mono">{shortHash(plan.plan.hash, 8, 6)}</dd></div>
