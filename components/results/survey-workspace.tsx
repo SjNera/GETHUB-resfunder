@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useSelectedLayoutSegment } from "next/navigation";
 import { useCallback, useState } from "react";
 import type { Address } from "viem";
 import type { LogResponse, SurveyDetails } from "@/lib/api/shapes";
@@ -9,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ApiClientError, api } from "@/lib/ui/api-client";
 import { shortAddress } from "@/lib/ui/auth/metamask";
 import { bnbAmount } from "@/lib/ui/format";
-import { filterRows, STATUS_LABEL, type ResultFilter } from "@/lib/ui/results";
-import type { TabId } from "@/lib/ui/survey-tabs";
+import { filterRows, isTabId, STATUS_LABEL, type ResultFilter } from "@/lib/ui/results";
 import { connectWallet, sendCloseSurvey, signProof, waitForTx } from "@/lib/ui/wallet";
 
 const errText = (e: unknown) =>
@@ -18,7 +18,10 @@ const errText = (e: unknown) =>
 
 type Data = { log: LogResponse; details: SurveyDetails };
 
-export function SurveyWorkspace({ surveyId, tab }: { surveyId: number; tab: TabId }) {
+/** Lives in the [id] layout, so signing in once carries across the tabs. */
+export function SurveyWorkspace({ surveyId }: { surveyId: number }) {
+  const segment = useSelectedLayoutSegment();
+  const tab = segment && isTabId(segment) ? segment : "overview";
   const [wallet, setWallet] = useState<Address | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [busy, setBusy] = useState<"idle" | "load" | "close">("idle");
